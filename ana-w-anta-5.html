@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>أنا وانت</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0a0810;
+  --purple:   #2a1a4a;
+  --violet:   #4b2d7f;
+  --rose:     #8b3a5a;
+  --gold:     #c9a84c;
+  --gold-lt:  #e8d08a;
+  --gold-dim: #7a6230;
+  --cream:    #f5efe2;
+  --cream2:   #ede4d0;
+  --ink:      #140e1e;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  background: radial-gradient(ellipse at 30% 0%, rgba(75,45,127,0.25) 0%, transparent 55%),
+              radial-gradient(ellipse at 70% 100%, rgba(139,58,90,0.18) 0%, transparent 50%),
+              var(--bg);
+  font-family:'Cairo',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ══ SCREENS ══ */
+.screen { display:none; min-height:100vh; flex-direction:column; align-items:center; justify-content:center; padding:30px 20px; }
+.screen.active { display:flex; }
+
+/* ══ HOME SCREEN ══ */
+.home-ornament { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
+.h-line { flex:1; max-width:100px; height:1px; background:linear-gradient(90deg,transparent,var(--gold-dim)); }
+.h-line.r { background:linear-gradient(90deg,var(--gold-dim),transparent); }
+.h-diamond { width:8px; height:8px; background:var(--gold); transform:rotate(45deg); box-shadow:0 0 12px rgba(201,168,76,0.5); }
+.home-title { font-family:'Scheherazade New',serif; font-size:clamp(3rem,10vw,5rem); color:var(--gold); letter-spacing:8px; text-shadow:0 0 40px rgba(201,168,76,0.3); text-align:center; }
+.home-sub { font-size:0.75rem; color:rgba(245,239,226,0.3); letter-spacing:4px; margin-top:10px; text-transform:uppercase; text-align:center; }
+
+.home-btns { display:flex; flex-direction:column; gap:14px; margin-top:50px; width:100%; max-width:300px; }
+
+.btn-primary {
+  background:linear-gradient(135deg,var(--violet),var(--rose));
+  color:var(--cream); border:none; border-radius:50px;
+  padding:16px 32px; font-family:'Cairo',sans-serif;
+  font-size:1rem; font-weight:700; cursor:pointer;
+  box-shadow:0 8px 32px rgba(75,45,127,0.4);
+  transition:transform .2s, box-shadow .2s;
+  letter-spacing:1px;
+}
+.btn-primary:active { transform:scale(0.97); }
+
+.btn-secondary {
+  background:transparent;
+  color:var(--gold); border:1px solid rgba(201,168,76,0.35);
+  border-radius:50px; padding:14px 32px;
+  font-family:'Cairo',sans-serif; font-size:1rem;
+  font-weight:600; cursor:pointer;
+  transition:all .2s; letter-spacing:1px;
+}
+.btn-secondary:active { background:rgba(201,168,76,0.08); }
+
+/* ══ INPUT SCREEN ══ */
+.input-card {
+  background:linear-gradient(150deg,rgba(42,26,74,0.8),rgba(17,12,34,0.9));
+  border:1px solid rgba(201,168,76,0.15);
+  border-radius:24px; padding:40px 28px;
+  width:100%; max-width:340px;
+  box-shadow:0 24px 60px rgba(0,0,0,0.5);
+  text-align:center;
+}
+.input-title { font-family:'Scheherazade New',serif; font-size:1.8rem; color:var(--gold); margin-bottom:8px; }
+.input-sub { font-size:0.78rem; color:rgba(245,239,226,0.4); margin-bottom:30px; line-height:1.7; }
+.input-field {
+  width:100%; background:rgba(255,255,255,0.06);
+  border:1px solid rgba(201,168,76,0.2); border-radius:14px;
+  padding:14px 18px; font-family:'Cairo',sans-serif;
+  font-size:1rem; color:var(--cream); outline:none;
+  text-align:center; margin-bottom:16px;
+  transition:border-color .2s;
+}
+.input-field:focus { border-color:rgba(201,168,76,0.5); }
+.input-field::placeholder { color:rgba(245,239,226,0.25); }
+.code-display {
+  font-size:2.5rem; font-weight:900; color:var(--gold);
+  letter-spacing:12px; margin:20px 0;
+  text-shadow:0 0 20px rgba(201,168,76,0.4);
+}
+.status-dot {
+  display:inline-block; width:8px; height:8px;
+  border-radius:50%; margin-left:8px;
+  animation:pulse 1.5s infinite;
+}
+.status-dot.waiting { background:#f59e0b; }
+.status-dot.connected { background:#10b981; animation:none; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.status-text { font-size:0.82rem; color:rgba(245,239,226,0.5); margin-top:10px; display:flex; align-items:center; justify-content:center; }
+
+/* ══ GAME SCREEN ══ */
+.game-screen { padding:0; justify-content:flex-start; }
+.game-header {
+  width:100%; padding:18px 24px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid rgba(201,168,76,0.08);
+}
+.game-logo { font-family:'Scheherazade New',serif; font-size:1.4rem; color:var(--gold); }
+.game-status { font-size:0.72rem; color:rgba(245,239,226,0.4); display:flex; align-items:center; gap:6px; }
+
+.game-body {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:24px 20px; width:100%;
+}
+
+/* Question card */
+.q-card-game {
+  width:100%; max-width:360px;
+  background:linear-gradient(150deg,#faf6ee 0%,#f2e9d4 60%,#ece0c4 100%);
+  border-radius:20px; padding:36px 28px 32px;
+  text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3),
+             inset 0 1px 0 rgba(255,255,255,0.9);
+  position:relative; overflow:hidden;
+}
+.q-card-game::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+}
+.q-top-line { width:40px; height:1.5px; background:linear-gradient(90deg,transparent,rgba(139,58,90,0.5),transparent); margin:0 auto 16px; }
+.q-num-game { font-size:0.65rem; color:#7a3050; letter-spacing:4px; text-transform:uppercase; margin-bottom:16px; font-weight:700; }
+.q-text-game { font-size:1.1rem; font-weight:800; color:var(--ink); line-height:1.9; }
+.q-dots-game { display:flex; justify-content:center; gap:6px; margin-top:20px; }
+.q-dots-game i { display:block; border-radius:50%; background:rgba(139,58,90,0.4); }
+.q-dots-game i:nth-child(1) { width:4px;height:4px; }
+.q-dots-game i:nth-child(2) { width:6px;height:6px;background:rgba(139,58,90,0.6); }
+.q-dots-game i:nth-child(3) { width:4px;height:4px; }
+
+/* Category badge */
+.cat-badge {
+  display:inline-block; padding:5px 16px;
+  border-radius:50px; font-size:0.7rem; font-weight:700;
+  margin-bottom:20px; letter-spacing:1px;
+}
+.cat-deep    { background:rgba(75,45,127,0.25); color:#b39ddb; border:1px solid rgba(75,45,127,0.3); }
+.cat-bold    { background:rgba(139,58,90,0.25); color:#f48fb1; border:1px solid rgba(139,58,90,0.3); }
+.cat-romantic{ background:rgba(201,168,76,0.2); color:#e8d08a; border:1px solid rgba(201,168,76,0.25); }
+
+/* Answer section */
+.answers-row {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:12px; width:100%; max-width:360px; margin-top:20px;
+}
+.answer-box {
+  background:rgba(42,26,74,0.5);
+  border:1px solid rgba(201,168,76,0.12);
+  border-radius:16px; padding:14px;
+  text-align:center; min-height:80px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.answer-box .a-label { font-size:0.65rem; color:rgba(245,239,226,0.35); letter-spacing:2px; margin-bottom:8px; }
+.answer-box .a-text { font-size:0.9rem; color:var(--cream); font-weight:600; line-height:1.4; }
+.answer-box .a-waiting { font-size:0.75rem; color:rgba(245,239,226,0.2); }
+
+.answer-input-wrap { width:100%; max-width:360px; margin-top:12px; position:relative; }
+.answer-input {
+  width:100%; background:rgba(42,26,74,0.4);
+  border:1px solid rgba(201,168,76,0.2); border-radius:14px;
+  padding:14px 60px 14px 18px; font-family:'Cairo',sans-serif;
+  font-size:0.95rem; color:var(--cream); outline:none;
+  transition:border-color .2s; resize:none; height:56px;
+}
+.answer-input:focus { border-color:rgba(201,168,76,0.45); }
+.answer-input::placeholder { color:rgba(245,239,226,0.2); }
+.send-btn {
+  position:absolute; left:8px; top:50%; transform:translateY(-50%);
+  background:linear-gradient(135deg,var(--violet),var(--rose));
+  border:none; border-radius:10px; width:40px; height:40px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:1.1rem; transition:transform .15s;
+}
+.send-btn:active { transform:translateY(-50%) scale(0.93); }
+
+/* Nav buttons */
+.game-nav {
+  display:flex; gap:12px; margin-top:16px;
+  width:100%; max-width:360px;
+}
+.nav-btn {
+  flex:1; background:rgba(42,26,74,0.4);
+  border:1px solid rgba(201,168,76,0.15);
+  border-radius:14px; padding:13px;
+  color:var(--gold); font-family:'Cairo',sans-serif;
+  font-size:0.85rem; font-weight:700; cursor:pointer;
+  transition:all .2s; letter-spacing:1px;
+}
+.nav-btn:active { background:rgba(75,45,127,0.4); }
+.nav-btn.random {
+  background:linear-gradient(135deg,rgba(75,45,127,0.6),rgba(139,58,90,0.5));
+  border-color:rgba(201,168,76,0.25);
+}
+
+/* Progress */
+.progress-wrap { width:100%; max-width:360px; margin-top:14px; }
+.progress-bar-bg { background:rgba(255,255,255,0.06); border-radius:10px; height:4px; overflow:hidden; }
+.progress-bar-fill { height:100%; background:linear-gradient(90deg,var(--violet),var(--rose)); border-radius:10px; transition:width .4s ease; }
+.progress-text { font-size:0.65rem; color:rgba(245,239,226,0.25); text-align:center; margin-top:6px; letter-spacing:2px; }
+
+/* Timer */
+.timer-wrap { display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:16px; }
+.timer-circle {
+  width:48px; height:48px; border-radius:50%;
+  background:conic-gradient(var(--gold) 0deg, rgba(255,255,255,0.06) 0deg);
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.85rem; font-weight:700; color:var(--gold);
+  position:relative; transition:background 1s linear;
+}
+
+/* Overlay for reveal */
+.reveal-overlay {
+  position:fixed; inset:0; background:rgba(6,5,13,0.97);
+  display:none; align-items:center; justify-content:center;
+  z-index:999; flex-direction:column; gap:20px; padding:30px;
+}
+.reveal-overlay.show { display:flex; animation:fadeIn .3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
+.reveal-title { font-family:'Scheherazade New',serif; font-size:1.5rem; color:var(--gold); text-align:center; }
+.reveal-cards { display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:360px; }
+.reveal-card { background:linear-gradient(150deg,rgba(42,26,74,0.9),rgba(17,12,34,0.95)); border:1px solid rgba(201,168,76,0.2); border-radius:16px; padding:18px 14px; text-align:center; }
+.reveal-name { font-size:0.65rem; color:var(--gold); letter-spacing:2px; margin-bottom:10px; }
+.reveal-ans { font-size:0.95rem; color:var(--cream); font-weight:700; line-height:1.5; }
+.reveal-close { margin-top:10px; }
+
+/* Loader */
+.loader { display:inline-block; width:32px; height:32px; border:3px solid rgba(201,168,76,0.15); border-top-color:var(--gold); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* Back btn */
+.back-btn { position:absolute; top:18px; right:20px; background:none; border:none; color:rgba(245,239,226,0.4); font-size:1.2rem; cursor:pointer; padding:4px; }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen active" id="homeScreen">
+  <div class="home-ornament">
+    <div class="h-line"></div><div class="h-diamond"></div><div class="h-line r"></div>
+  </div>
+  <div class="home-title">أنا وانت</div>
+  <div class="home-sub">٦٥ سؤال · للمرتبطين</div>
+  <div class="home-btns">
+    <button class="btn-primary" onclick="showCreate()">✦ إنشاء غرفة</button>
+    <button class="btn-secondary" onclick="showJoin()">الانضمام لغرفة</button>
+  </div>
+</div>
+
+<!-- CREATE ROOM -->
+<div class="screen" id="createScreen">
+  <button class="back-btn" onclick="goHome()">←</button>
+  <div class="input-card">
+    <div class="input-title">غرفتك الخاصة</div>
+    <div class="input-sub">اكتب اسمك وشارك الكود مع حبيبتك</div>
+    <input class="input-field" id="createName" placeholder="اسمك..." maxlength="20">
+    <button class="btn-primary" style="width:100%;margin-top:8px" onclick="createRoom()">إنشاء الغرفة ✦</button>
+    <div id="createResult" style="margin-top:24px;display:none">
+      <div style="font-size:0.7rem;color:rgba(245,239,226,0.35);letter-spacing:3px;margin-bottom:8px">كود الغرفة</div>
+      <div class="code-display" id="roomCodeDisplay">----</div>
+      <button class="btn-secondary" style="width:100%;margin-top:8px;font-size:0.85rem" onclick="copyCode()">نسخ الكود 📋</button>
+      <div class="status-text">
+        <span id="waitText">بانتظار حبيبتك...</span>
+        <span class="status-dot waiting" id="waitDot"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JOIN ROOM -->
+<div class="screen" id="joinScreen">
+  <button class="back-btn" onclick="goHome()">←</button>
+  <div class="input-card">
+    <div class="input-title">انضم للغرفة</div>
+    <div class="input-sub">اكتب اسمك والكود اللي بعثه لك</div>
+    <input class="input-field" id="joinName" placeholder="اسمك..." maxlength="20">
+    <input class="input-field" id="joinCode" placeholder="كود الغرفة (4 أرقام)" maxlength="4" style="letter-spacing:8px;font-size:1.3rem;font-weight:700">
+    <button class="btn-primary" style="width:100%;margin-top:8px" onclick="joinRoom()">دخول ✦</button>
+    <div id="joinLoader" style="display:none;text-align:center;margin-top:20px"><div class="loader"></div></div>
+    <div id="joinError" style="display:none;margin-top:12px;font-size:0.82rem;color:#f48fb1;text-align:center"></div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen game-screen" id="gameScreen">
+  <div class="game-header">
+    <div class="game-logo">أنا وانت</div>
+    <div class="game-status">
+      <span class="status-dot connected"></span>
+      <span id="partnerStatusText">متصلين</span>
+    </div>
+  </div>
+
+  <div class="game-body">
+    <!-- Timer -->
+    <div class="timer-wrap">
+      <div class="timer-circle" id="timerCircle">
+        <span id="timerNum">60</span>
+      </div>
+    </div>
+
+    <!-- Category badge -->
+    <div id="catBadge" class="cat-badge cat-romantic">رومانسي ♥</div>
+
+    <!-- Question card -->
+    <div class="q-card-game">
+      <div class="q-top-line"></div>
+      <div class="q-num-game" id="qNumGame">السؤال 1</div>
+      <div class="q-text-game" id="qTextGame">جاري تحميل السؤال...</div>
+      <div class="q-dots-game"><i></i><i></i><i></i></div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-text" id="progressText">0 / 65</div>
+    </div>
+
+    <!-- Answers -->
+    <div class="answers-row">
+      <div class="answer-box">
+        <div class="a-label" id="myLabel">أنت</div>
+        <div class="a-text" id="myAnswerDisplay"><span class="a-waiting">لم تجب بعد</span></div>
+      </div>
+      <div class="answer-box">
+        <div class="a-label" id="partnerLabel">هي</div>
+        <div class="a-text" id="partnerAnswerDisplay"><span class="a-waiting">بانتظارها...</span></div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="answer-input-wrap">
+      <textarea class="answer-input" id="myAnswer" placeholder="إجابتك..." rows="1"></textarea>
+      <button class="send-btn" onclick="sendAnswer()">↑</button>
+    </div>
+
+    <!-- Nav -->
+    <div class="game-nav">
+      <button class="nav-btn" onclick="prevQ()">◀ السابق</button>
+      <button class="nav-btn random" onclick="randomQ()">عشوائي ✦</button>
+      <button class="nav-btn" onclick="nextQ()">التالي ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVEAL OVERLAY -->
+<div class="reveal-overlay" id="revealOverlay">
+  <div class="reveal-title">✦ إجابتكم ✦</div>
+  <div class="reveal-cards">
+    <div class="reveal-card">
+      <div class="reveal-name" id="revealMyName">أنت</div>
+      <div class="reveal-ans" id="revealMyAns">—</div>
+    </div>
+    <div class="reveal-card">
+      <div class="reveal-name" id="revealPartnerName">هي</div>
+      <div class="reveal-ans" id="revealPartnerAns">—</div>
+    </div>
+  </div>
+  <button class="btn-primary reveal-close" onclick="closeReveal()">متابعة ✦</button>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://rrbzbxjavdoqnhuytgbi.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJyYnpieGphdmRvcW5odXl0Z2JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0MzQyODksImV4cCI6MjA5NTAxMDI4OX0.NAaHrAAYIMe8heVBbH8Jd1BwMU_UmMJm65z6nSeSAaM';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── State ──
+let myName = '', partnerName = '', roomCode = '', roomId = null;
+let isHost = false, currentQ = 0, pollInterval = null, timerInterval = null, timerSec = 60;
+let answered = false;
+
+// ── Questions ──
+const questions = [
+  {t:"هل مرة حسيت إنك بتحبني بطريقة ما قدرت تشرحها لحتى نفسك؟", c:"romantic"},
+  {t:"شو أول شي لفت نظرك فيّ؟ ولسا نفس الشي؟", c:"romantic"},
+  {t:"لو تكتب لي رسالة ما رح تبعثها، شو بتكتب؟", c:"deep"},
+  {t:"هل في لحظة صمت بيننا حسيت إنها أحكت أكثر من الكلام؟", c:"deep"},
+  {t:"شو اللحظة اللي عرفت فيها إنك مش رح تنساني؟", c:"romantic"},
+  {t:"لو تختار مكان واحد نروحه مع بعض، وين بيكون؟", c:"romantic"},
+  {t:"هل حسيت يوم إنك خايف تخسرني؟ كيف كان الإحساس؟", c:"deep"},
+  {t:"شو أصعب شي قلته لي؟ وكيف حسيت بعده؟", c:"deep"},
+  {t:"لو تعيد يوم واحد قضيناه مع بعض، أنهو يوم؟", c:"romantic"},
+  {t:"شو الجملة اللي لو قلتها لي، بتحس إنها رح تغير كل شي بيننا؟", c:"bold"},
+  {t:"هل في نسخة منك بس أنا شايفها؟", c:"deep"},
+  {t:"هل رسالة بعثتها لي وندمت إنك ما بعثتها؟", c:"bold"},
+  {t:"شو اللي بتتمنى إنني كنت أعرفه عنك من البداية؟", c:"deep"},
+  {t:"لو تصف علاقتنا بلون، أنهو لون وليش؟", c:"romantic"},
+  {t:"هل في لحظة ندمت إنك ما قلت بحبك بوقتها؟", c:"bold"},
+  {t:"شو اللحظة اللي حسيت فيها إنك بأمان معي؟", c:"romantic"},
+  {t:"هل حاولت تفهمني بطريقة ما انتبهت إنك عم تحاول؟", c:"deep"},
+  {t:"شو اللي بيخليك تصحى بالصبح وتفكر فيّ؟", c:"romantic"},
+  {t:"لو تكتب عنّا جملة واحدة تلخص كل شي، شو بتكتب؟", c:"romantic"},
+  {t:"هل بتحس إني بحبك بنفس الطريقة اللي بتحتاجها؟", c:"deep"},
+  {t:"شو الشي اللي بتحس إنه ناقص بيننا وبتتمنى يكون؟", c:"deep"},
+  {t:"هل في شي صغير بعملو كل يوم وفيه شي منك؟", c:"romantic"},
+  {t:"شو الشي اللي بيخليك تبتسم لما تفكر فينا؟", c:"romantic"},
+  {t:"لو تختار هدية مو مادية تعطيني إياها، شو بتختار؟", c:"romantic"},
+  {t:"شو اللي بتتمنى إني ما أتغير فيه أبدًا؟", c:"romantic"},
+  {t:"هل في خوف مشترك بيننا ما اتكلمنا عنه؟", c:"deep"},
+  {t:"لو تختار فصل من السنة يمثلنا، أنهو فصل وليش؟", c:"romantic"},
+  {t:"شو أكثر لحظة حسيت فيها أنا وانت ضد العالم؟", c:"bold"},
+  {t:"هل في جانب من شخصيتك بس ظهر بعد ما عرفتني؟", c:"deep"},
+  {t:"لو تختار مشهد من فيلم يمثل علاقتنا، أنهو مشهد؟", c:"romantic"},
+  {t:"شو اللي بتتمنى يصير بيننا بعد خمس سنين؟", c:"deep"},
+  {t:"هل بتحس إني بفهمك من نظرتك بدون ما تحكي؟", c:"romantic"},
+  {t:"شو الشي اللي بتعمله لما تشتاقلي وما تقدر تشوفني؟", c:"romantic"},
+  {t:"لو تختار كلمة وصف فيها حبك إلي، شو بتختار؟", c:"romantic"},
+  {t:"هل في طريقة بتحب فيها أعبر عن حبي إلك غير اللي عم بعملها؟", c:"bold"},
+  {t:"شو أصعب وداع مررنا فيه، حتى لو كان لفترة قصيرة؟", c:"deep"},
+  {t:"هل في حلم شاركتني فيه ولسا بتفكر فيه؟", c:"romantic"},
+  {t:"شو الشي اللي بتحس إنه بيربطنا أكثر من أي شي ثاني؟", c:"deep"},
+  {t:"لو تحكي لأهلك عني بجملة واحدة، شو بتقول؟", c:"bold"},
+  {t:"شو أكثر شي بيخليك تحس إنك مرتاح معي؟", c:"romantic"},
+  {t:"هل حسيت يوم إنك بتحبني بصمت أكثر مما بتعبر؟", c:"deep"},
+  {t:"شو اللي بيخليك تحس إنك محظوظ إننا التقينا؟", c:"romantic"},
+  {t:"هل في خطة مشتركة بتتمنى ما تتأجل؟", c:"deep"},
+  {t:"هل في جملة قلتها لك يوم ولسا عايشة معك؟", c:"romantic"},
+  {t:"شو اللحظة اللي حسيت فيها إننا أصحاب قبل ما نكون أي شي ثاني؟", c:"romantic"},
+  {t:"هل في شي بتتمنى إني كنت سألتك عنه قبل؟", c:"deep"},
+  {t:"هل مرة استقصدت تخليني اغار؟", c:"bold"},
+  {t:"شو الشي اللي بتحس إنك ما قدرت تشرحه لي لحد هلق؟", c:"deep"},
+  {t:"لو تكتب لي رسالة تفتحها بعد عشر سنين، شو بتكتب؟", c:"romantic"},
+  {t:"شو اللي بيخليك تحس إنك مهتم فيّ أكثر من أي وقت؟", c:"romantic"},
+  {t:"هل في صورة إلنا ببالك بتتمنى تلتقطها؟", c:"romantic"},
+  {t:"شو اللحظة اللي حسيت فيها إنك فاهمني أكثر من أي أحد؟", c:"deep"},
+  {t:"لو تصف علاقتنا بأغنية، أنهي أغنية؟", c:"romantic"},
+  {t:"هل في شي بتخاف تسألني عنه؟", c:"bold"},
+  {t:"شو أكثر شي بيخليك تحس إنك مرتبط فيّ بطريقة ما تفسرها؟", c:"deep"},
+  {t:"هل في لحظة غضب مني ولسا عندك أثر منها بقلبك؟", c:"bold"},
+  {t:"شو اللحظة اللي حسيت فيها إنك شايف روحك بعيوني؟", c:"romantic"},
+  {t:"لو تختار وقت من اليوم يمثل علاقتنا، شو بتختار؟", c:"romantic"},
+  {t:"هل في شي تعلمته مني غير ما كنت تتوقعه؟", c:"deep"},
+  {t:"شو اللحظة اللي حسيت فيها إنك بتحبني بكل جوارحك؟", c:"romantic"},
+  {t:"هل بتحس إن في لغة بيننا بس إحنا نفهمها؟", c:"romantic"},
+  {t:"شو أكثر شي بتشتاقله مني لما ما نكون مع بعض؟", c:"romantic"},
+  {t:"هل في شي صغير بتعمله بسببي وما بتعترف فيه؟", c:"bold"},
+  {t:"لو تلخص كل اللي بيننا بكلمة واحدة فقط، شو بتقول؟", c:"romantic"},
+];
+
+const catLabels = { romantic:'رومانسي ♥', deep:'عميق ✦', bold:'جريء 🔥' };
+const catClasses = { romantic:'cat-romantic', deep:'cat-deep', bold:'cat-bold' };
+
+// ── API helpers ──
+const BASE = 'https://rrbzbxjavdoqnhuytgbi.supabase.co/rest/v1';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJyYnpieGphdmRvcW5odXl0Z2JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0MzQyODksImV4cCI6MjA5NTAxMDI4OX0.NAaHrAAYIMe8heVBbH8Jd1BwMU_UmMJm65z6nSeSAaM';
+const H = {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+
+async function dbGet(table, col, val) {
+  try {
+    const r = await fetch(`${BASE}/${table}?${col}=eq.${val}&select=*`, {headers:H});
+    return await r.json();
+  } catch(e) { return []; }
+}
+async function dbGetWhere(table, col1, val1, col2, val2) {
+  try {
+    const r = await fetch(`${BASE}/${table}?${col1}=eq.${val1}&${col2}=eq.${val2}&select=*`, {headers:H});
+    return await r.json();
+  } catch(e) { return []; }
+}
+async function dbInsert(table, data) {
+  try {
+    const r = await fetch(`${BASE}/${table}`, {method:'POST',headers:H,body:JSON.stringify(data)});
+    return await r.json();
+  } catch(e) { return []; }
+}
+async function dbUpdate(table, col, val, data) {
+  try {
+    const r = await fetch(`${BASE}/${table}?${col}=eq.${val}`, {method:'PATCH',headers:H,body:JSON.stringify(data)});
+    return await r.json();
+  } catch(e) { return []; }
+}
+
+// ── Navigation ──
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function goHome() { stopPolling(); showScreen('homeScreen'); }
+function showCreate() { showScreen('createScreen'); }
+function showJoin() { showScreen('joinScreen'); }
+
+// ── Create Room ──
+async function createRoom() {
+  const name = document.getElementById('createName').value.trim();
+  if(!name) { alert('اكتب اسمك أولاً'); return; }
+  myName = name; isHost = true;
+  roomCode = Math.floor(1000+Math.random()*9000).toString();
+  
+  try {
+    const rows = await dbInsert('game_rooms', {
+      code: roomCode, host_name: myName,
+      guest_name: null, current_q: 0,
+      host_answer: null, guest_answer: null, status:'waiting'
+    });
+    
+    if(rows && rows[0] && rows[0].id) {
+      roomId = rows[0].id;
+      document.getElementById('createResult').style.display='block';
+      document.getElementById('roomCodeDisplay').textContent = roomCode;
+      startPollingJoin();
+    } else {
+      // Try to get the room by code
+      await new Promise(r=>setTimeout(r,500));
+      const check = await dbGet('game_rooms','code',roomCode);
+      if(check && check[0]) {
+        roomId = check[0].id;
+        document.getElementById('createResult').style.display='block';
+        document.getElementById('roomCodeDisplay').textContent = roomCode;
+        startPollingJoin();
+      } else {
+        alert('حصل خطأ، جرب مرة ثانية');
+      }
+    }
+  } catch(e) {
+    alert('حصل خطأ: ' + e.message);
+  }
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(roomCode).then(()=>{ const b=document.querySelector('.btn-secondary'); b.textContent='تم النسخ ✓'; setTimeout(()=>b.textContent='نسخ الكود 📋',2000); });
+}
+
+function startPollingJoin() {
+  pollInterval = setInterval(async()=>{
+    const rows = await dbGet('game_rooms','id',roomId);
+    if(rows && rows[0] && rows[0].guest_name) {
+      partnerName = rows[0].guest_name;
+      document.getElementById('waitText').textContent = `${partnerName} انضمت! 🎉`;
+      document.getElementById('waitDot').className = 'status-dot connected';
+      stopPolling();
+      setTimeout(()=>startGame(), 1200);
+    }
+  }, 2000);
+}
+
+// ── Join Room ──
+async function joinRoom() {
+  const name = document.getElementById('joinName').value.trim();
+  const code = document.getElementById('joinCode').value.trim();
+  if(!name||!code) { alert('اكتب اسمك والكود'); return; }
+  myName = name; isHost = false; roomCode = code;
+  document.getElementById('joinLoader').style.display='block';
+  document.getElementById('joinError').style.display='none';
+  const rows = await dbGetWhere('game_rooms','code',code,'status','waiting');
+  if(!rows || !rows[0]) {
+    document.getElementById('joinLoader').style.display='none';
+    document.getElementById('joinError').style.display='block';
+    document.getElementById('joinError').textContent='الكود غلط أو الغرفة مش موجودة';
+    return;
+  }
+  roomId = rows[0].id;
+  partnerName = rows[0].host_name;
+  await dbUpdate('game_rooms','id',roomId,{guest_name:myName,status:'playing'});
+  document.getElementById('joinLoader').style.display='none';
+  startGame();
+}
+
+// ── Game ──
+function startGame() {
+  currentQ = 0; answered = false;
+  document.getElementById('myLabel').textContent = myName;
+  document.getElementById('partnerLabel').textContent = partnerName;
+  document.getElementById('revealMyName').textContent = myName;
+  document.getElementById('revealPartnerName').textContent = partnerName;
+  showScreen('gameScreen');
+  loadQuestion();
+  startPollingAnswers();
+}
+
+function loadQuestion() {
+  const q = questions[currentQ];
+  document.getElementById('qNumGame').textContent = `السؤال ${currentQ+1}`;
+  document.getElementById('qTextGame').textContent = q.t;
+  const badge = document.getElementById('catBadge');
+  badge.textContent = catLabels[q.c];
+  badge.className = 'cat-badge ' + catClasses[q.c];
+  document.getElementById('progressFill').style.width = ((currentQ+1)/65*100)+'%';
+  document.getElementById('progressText').textContent = `${currentQ+1} / 65`;
+  document.getElementById('myAnswer').value='';
+  document.getElementById('myAnswerDisplay').innerHTML='<span class="a-waiting">لم تجب بعد</span>';
+  document.getElementById('partnerAnswerDisplay').innerHTML='<span class="a-waiting">بانتظارها...</span>';
+  answered = false;
+  resetTimer();
+}
+
+async function sendAnswer() {
+  const ans = document.getElementById('myAnswer').value.trim();
+  if(!ans) return;
+  answered = true;
+  document.getElementById('myAnswerDisplay').textContent = ans;
+  const field = isHost ? {host_answer:ans} : {guest_answer:ans};
+  await dbUpdate('game_rooms','id',roomId,field);
+}
+
+function startPollingAnswers() {
+  if(pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async()=>{
+    const rows = await dbGet('game_rooms','id',roomId);
+    if(!rows||!rows[0]) return;
+    const room = rows[0];
+    const partnerAns = isHost ? room.guest_answer : room.host_answer;
+    const myAns = isHost ? room.host_answer : room.guest_answer;
+    if(partnerAns) document.getElementById('partnerAnswerDisplay').textContent = partnerAns;
+    // If both answered → show reveal
+    if(myAns && partnerAns && !document.getElementById('revealOverlay').classList.contains('show')) {
+      document.getElementById('revealMyAns').textContent = myAns;
+      document.getElementById('revealPartnerAns').textContent = partnerAns;
+      document.getElementById('revealOverlay').classList.add('show');
+    }
+  }, 2000);
+}
+
+function stopPolling() { if(pollInterval) { clearInterval(pollInterval); pollInterval=null; } }
+
+function closeReveal() {
+  document.getElementById('revealOverlay').classList.remove('show');
+  // reset answers in db
+  dbUpdate('game_rooms','id',roomId,{host_answer:null,guest_answer:null});
+}
+
+function nextQ() { if(currentQ<64){currentQ++;} else {currentQ=0;} loadQuestion(); dbUpdate('game_rooms','id',roomId,{current_q:currentQ,host_answer:null,guest_answer:null}); }
+function prevQ() { if(currentQ>0){currentQ--;} loadQuestion(); dbUpdate('game_rooms','id',roomId,{current_q:currentQ,host_answer:null,guest_answer:null}); }
+function randomQ() { currentQ=Math.floor(Math.random()*65); loadQuestion(); dbUpdate('game_rooms','id',roomId,{current_q:currentQ,host_answer:null,guest_answer:null}); }
+
+// ── Timer ──
+function resetTimer() {
+  if(timerInterval) clearInterval(timerInterval);
+  timerSec=60;
+  updateTimerUI();
+  timerInterval=setInterval(()=>{
+    timerSec--;
+    updateTimerUI();
+    if(timerSec<=0) { clearInterval(timerInterval); }
+  },1000);
+}
+function updateTimerUI() {
+  const el=document.getElementById('timerNum');
+  const circle=document.getElementById('timerCircle');
+  el.textContent=timerSec;
+  const deg=Math.round((timerSec/60)*360);
+  const color = timerSec>20 ? 'var(--gold)' : timerSec>10 ? '#f59e0b' : '#ef4444';
+  circle.style.background=`conic-gradient(${color} ${deg}deg, rgba(255,255,255,0.06) ${deg}deg)`;
+  el.style.color=color;
+}
+</script>
+</body>
+</html>
