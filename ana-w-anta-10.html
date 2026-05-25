@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>أنا وانت</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0810;--purple:#2a1a4a;--violet:#4b2d7f;
+  --rose:#8b3a5a;--gold:#c9a84c;--gold-lt:#e8d08a;
+  --gold-dim:#7a6230;--cream:#f5efe2;--cream2:#ede4d0;--ink:#140e1e;
+  --bold-red:#c0392b;--bold-orange:#e67e22;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:radial-gradient(ellipse at 30% 0%,rgba(75,45,127,.25) 0%,transparent 55%),radial-gradient(ellipse at 70% 100%,rgba(139,58,90,.18) 0%,transparent 50%),var(--bg);font-family:'Cairo',sans-serif;min-height:100vh;overflow-x:hidden}
+
+.screen{display:none;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px}
+.screen.active{display:flex}
+
+.hdr-ornament{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.h-line{flex:1;max-width:100px;height:1px;background:linear-gradient(90deg,transparent,var(--gold-dim))}
+.h-line.r{background:linear-gradient(90deg,var(--gold-dim),transparent)}
+.h-diamond{width:8px;height:8px;background:var(--gold);transform:rotate(45deg);box-shadow:0 0 12px rgba(201,168,76,.5)}
+.home-title{font-family:'Scheherazade New',serif;font-size:clamp(3rem,10vw,5rem);color:var(--gold);letter-spacing:8px;text-shadow:0 0 40px rgba(201,168,76,.3);text-align:center}
+.home-sub{font-size:.75rem;color:rgba(245,239,226,.3);letter-spacing:4px;margin-top:10px;text-transform:uppercase;text-align:center}
+.home-btns{display:flex;flex-direction:column;gap:14px;margin-top:50px;width:100%;max-width:300px}
+
+.btn-primary{background:linear-gradient(135deg,var(--violet),var(--rose));color:var(--cream);border:none;border-radius:50px;padding:16px 32px;font-family:'Cairo',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;box-shadow:0 8px 32px rgba(75,45,127,.4);transition:transform .2s;letter-spacing:1px}
+.btn-primary:active{transform:scale(.97)}
+.btn-secondary{background:transparent;color:var(--gold);border:1px solid rgba(201,168,76,.35);border-radius:50px;padding:14px 32px;font-family:'Cairo',sans-serif;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:1px}
+.btn-secondary:active{background:rgba(201,168,76,.08)}
+
+.input-card{background:linear-gradient(150deg,rgba(42,26,74,.8),rgba(17,12,34,.9));border:1px solid rgba(201,168,76,.15);border-radius:24px;padding:40px 28px;width:100%;max-width:340px;box-shadow:0 24px 60px rgba(0,0,0,.5);text-align:center;position:relative}
+.input-title{font-family:'Scheherazade New',serif;font-size:1.8rem;color:var(--gold);margin-bottom:8px}
+.input-sub{font-size:.78rem;color:rgba(245,239,226,.4);margin-bottom:30px;line-height:1.7}
+.input-field{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(201,168,76,.2);border-radius:14px;padding:14px 18px;font-family:'Cairo',sans-serif;font-size:1rem;color:var(--cream);outline:none;text-align:center;margin-bottom:16px;transition:border-color .2s}
+.input-field:focus{border-color:rgba(201,168,76,.5)}
+.input-field::placeholder{color:rgba(245,239,226,.25)}
+.code-display{font-size:2.5rem;font-weight:900;color:var(--gold);letter-spacing:12px;margin:20px 0;text-shadow:0 0 20px rgba(201,168,76,.4)}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:8px;animation:pulse 1.5s infinite}
+.status-dot.waiting{background:#f59e0b}.status-dot.connected{background:#10b981;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.status-text{font-size:.82rem;color:rgba(245,239,226,.5);margin-top:10px;display:flex;align-items:center;justify-content:center}
+.back-btn{position:absolute;top:18px;right:20px;background:none;border:none;color:rgba(245,239,226,.4);font-size:1.2rem;cursor:pointer;padding:4px}
+
+.game-screen{padding:0;justify-content:flex-start}
+.game-header{width:100%;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(201,168,76,.08);position:sticky;top:0;z-index:10;background:rgba(10,8,16,.95)}
+.game-logo{font-family:'Scheherazade New',serif;font-size:1.3rem;color:var(--gold)}
+.game-status{font-size:.72rem;color:rgba(245,239,226,.4);display:flex;align-items:center;gap:6px}
+.game-body{flex:1;display:flex;flex-direction:column;align-items:center;padding:14px 16px 100px;width:100%;gap:10px;overflow-y:auto}
+
+.points-bar{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:360px;background:rgba(42,26,74,.4);border:1px solid rgba(201,168,76,.12);border-radius:14px;padding:10px 18px}
+.point-side{text-align:center}
+.point-name{font-size:.6rem;color:rgba(245,239,226,.35);letter-spacing:2px;margin-bottom:4px}
+.point-score{font-size:1.4rem;font-weight:900;color:var(--gold)}
+.point-vs{font-size:.75rem;color:rgba(245,239,226,.2);font-weight:700}
+
+.timer-wrap{display:flex;align-items:center;justify-content:center;gap:10px}
+.timer-circle{width:52px;height:52px;border-radius:50%;background:conic-gradient(var(--gold) 360deg,rgba(255,255,255,.06) 0deg);display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:700;color:var(--gold);transition:background .5s linear}
+.timer-paused{font-size:.65rem;color:rgba(245,239,226,.3);letter-spacing:2px}
+
+.cat-badge{display:inline-block;padding:5px 16px;border-radius:50px;font-size:.7rem;font-weight:700;letter-spacing:1px}
+.cat-romantic{background:rgba(201,168,76,.2);color:#e8d08a;border:1px solid rgba(201,168,76,.25)}
+.cat-deep{background:rgba(75,45,127,.25);color:#b39ddb;border:1px solid rgba(75,45,127,.3)}
+.cat-bold{background:rgba(192,57,43,.2);color:#ff8a80;border:1px solid rgba(192,57,43,.3)}
+.cat-night{background:rgba(30,15,60,.6);color:#ce93d8;border:1px solid rgba(156,39,176,.3)}
+
+.q-card-game{width:100%;max-width:360px;background:linear-gradient(150deg,#faf6ee 0%,#f2e9d4 60%,#ece0c4 100%);border-radius:20px;padding:32px 24px 28px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5),0 4px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.9);position:relative}
+.q-card-game::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--gold),transparent);border-radius:20px 20px 0 0}
+.q-top-line{width:40px;height:1.5px;background:linear-gradient(90deg,transparent,rgba(139,58,90,.5),transparent);margin:0 auto 14px}
+.q-num-game{font-size:.62rem;color:#7a3050;letter-spacing:4px;text-transform:uppercase;margin-bottom:14px;font-weight:700}
+.q-text-game{font-size:1.05rem;font-weight:800;color:var(--ink);line-height:1.9}
+.q-dots-game{display:flex;justify-content:center;gap:6px;margin-top:16px}
+.q-dots-game i{display:block;border-radius:50%;background:rgba(139,58,90,.4)}
+.q-dots-game i:nth-child(1){width:4px;height:4px}
+.q-dots-game i:nth-child(2){width:6px;height:6px;background:rgba(139,58,90,.6)}
+.q-dots-game i:nth-child(3){width:4px;height:4px}
+
+.progress-wrap{width:100%;max-width:360px}
+.progress-bar-bg{background:rgba(255,255,255,.06);border-radius:10px;height:4px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--violet),var(--rose));border-radius:10px;transition:width .4s ease}
+.progress-text{font-size:.62rem;color:rgba(245,239,226,.25);text-align:center;margin-top:5px;letter-spacing:2px}
+
+.answers-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:360px}
+.answer-box{background:rgba(42,26,74,.5);border:1px solid rgba(201,168,76,.12);border-radius:14px;padding:12px;text-align:center;min-height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.a-label{font-size:.6rem;color:rgba(245,239,226,.35);letter-spacing:2px;margin-bottom:6px}
+.a-text{font-size:.88rem;color:var(--cream);font-weight:600;line-height:1.4}
+.a-waiting{font-size:.75rem;color:rgba(245,239,226,.2)}
+
+.rating-row{display:flex;justify-content:center;gap:12px;margin-top:4px}
+.rate-btn{background:none;border:none;font-size:1.3rem;cursor:pointer;opacity:.4;transition:all .2s;padding:4px}
+.rate-btn.active{opacity:1;transform:scale(1.3)}
+
+.answer-input-wrap{width:100%;max-width:360px;position:relative}
+.answer-input{width:100%;background:rgba(42,26,74,.4);border:1px solid rgba(201,168,76,.2);border-radius:14px;padding:13px 56px 13px 16px;font-family:'Cairo',sans-serif;font-size:.95rem;color:var(--cream);outline:none;transition:border-color .2s;resize:none;height:52px}
+.answer-input:focus{border-color:rgba(201,168,76,.45)}
+.answer-input::placeholder{color:rgba(245,239,226,.2)}
+.answer-input:disabled{opacity:.4}
+.send-btn{position:absolute;left:8px;top:50%;transform:translateY(-50%);background:linear-gradient(135deg,var(--violet),var(--rose));border:none;border-radius:10px;width:38px;height:38px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;color:white;transition:transform .15s}
+.send-btn:active{transform:translateY(-50%) scale(.93)}
+.send-btn:disabled{opacity:.4}
+
+.game-nav{display:flex;gap:10px;width:100%;max-width:360px}
+.nav-btn{flex:1;background:rgba(42,26,74,.4);border:1px solid rgba(201,168,76,.15);border-radius:14px;padding:12px;color:var(--gold);font-family:'Cairo',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:1px}
+.nav-btn:active{background:rgba(75,45,127,.4)}
+.nav-btn.random{background:linear-gradient(135deg,rgba(75,45,127,.6),rgba(139,58,90,.5));border-color:rgba(201,168,76,.25)}
+
+.action-row{display:flex;gap:10px;width:100%;max-width:360px}
+.pause-btn{flex:1;background:rgba(42,26,74,.3);border:1px solid rgba(201,168,76,.15);border-radius:14px;padding:11px;color:var(--gold-lt);font-family:'Cairo',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .2s}
+.end-btn{flex:1;background:rgba(192,57,43,.15);border:1px solid rgba(192,57,43,.25);border-radius:14px;padding:11px;color:#ff8a80;font-family:'Cairo',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .2s}
+
+.float-btns{position:fixed;bottom:20px;left:0;right:0;display:none;justify-content:space-between;padding:0 20px;z-index:100;pointer-events:none}
+.float-btns.show{display:flex}
+.float-btn{width:44px;height:44px;border-radius:50%;border:1px solid rgba(201,168,76,.3);color:var(--gold);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.4);transition:all .2s;pointer-events:all}
+.fb-music{background:rgba(42,26,74,.85)}
+.fb-chat{background:rgba(42,26,74,.85)}
+.fb-chat.unread{border-color:var(--rose);background:rgba(139,58,90,.4)}
+.fb-night{background:rgba(20,10,40,.85)}
+
+body.night-mode{background:#050308}
+body.night-mode .q-card-game{background:linear-gradient(150deg,#1a1025 0%,#120c1e 100%);box-shadow:0 20px 60px rgba(0,0,0,.8)}
+body.night-mode .q-text-game{color:#e0d0f0}
+body.night-mode .q-num-game{color:#9c6ba0}
+body.night-mode .q-top-line{background:linear-gradient(90deg,transparent,rgba(156,107,160,.5),transparent)}
+
+.chat-panel{position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,6,16,.97);border-top:1px solid rgba(201,168,76,.15);transform:translateY(100%);transition:transform .3s ease;max-height:65vh;display:flex;flex-direction:column}
+.chat-panel.open{transform:translateY(0)}
+.chat-header{display:flex;justify-content:space-between;align-items:center;padding:13px 18px;border-bottom:1px solid rgba(201,168,76,.08)}
+.chat-title{font-family:'Scheherazade New',serif;font-size:1.1rem;color:var(--gold)}
+.chat-close{background:none;border:none;color:rgba(245,239,226,.4);font-size:1.3rem;cursor:pointer}
+.chat-messages{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-height:100px}
+.chat-msg{max-width:78%;padding:9px 13px;border-radius:16px;font-size:.86rem;line-height:1.5}
+.chat-msg.mine{background:linear-gradient(135deg,rgba(75,45,127,.7),rgba(139,58,90,.5));color:var(--cream);align-self:flex-end;border-bottom-left-radius:4px}
+.chat-msg.theirs{background:rgba(42,26,74,.5);color:var(--cream);align-self:flex-start;border-bottom-right-radius:4px;border:1px solid rgba(201,168,76,.1)}
+.chat-msg-name{font-size:.58rem;color:var(--gold);margin-bottom:3px;opacity:.7}
+.chat-input-row{display:flex;gap:8px;padding:10px 14px;border-top:1px solid rgba(201,168,76,.08)}
+.chat-input{flex:1;background:rgba(42,26,74,.4);border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:10px 13px;font-family:'Cairo',sans-serif;font-size:.88rem;color:var(--cream);outline:none}
+.chat-input::placeholder{color:rgba(245,239,226,.2)}
+.chat-send{background:linear-gradient(135deg,var(--violet),var(--rose));border:none;border-radius:12px;width:40px;height:40px;color:white;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* TOAST */
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:linear-gradient(135deg,var(--violet),var(--rose));color:var(--cream);padding:12px 24px;border-radius:50px;font-size:.85rem;font-weight:700;z-index:999;opacity:0;transition:all .4s;pointer-events:none;text-align:center;max-width:300px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* OVERLAY modals use a normal-flow faux-viewport wrapper */
+.overlay-wrap{position:fixed;inset:0;background:rgba(6,5,13,.97);display:none;align-items:center;justify-content:center;z-index:900;flex-direction:column;gap:16px;padding:28px;overflow-y:auto}
+.overlay-wrap.show{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.overlay-wrap.show > *{animation:fadeIn .3s ease}
+
+.reveal-title{font-family:'Scheherazade New',serif;font-size:1.5rem;color:var(--gold);text-align:center}
+.reveal-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:360px}
+.reveal-card{background:linear-gradient(150deg,rgba(42,26,74,.9),rgba(17,12,34,.95));border:1px solid rgba(201,168,76,.2);border-radius:16px;padding:16px 12px;text-align:center}
+.reveal-name{font-size:.62rem;color:var(--gold);letter-spacing:2px;margin-bottom:8px}
+.reveal-ans{font-size:.92rem;color:var(--cream);font-weight:700;line-height:1.5}
+.reveal-rating{margin-top:10px;font-size:1.2rem;display:flex;justify-content:center;gap:8px}
+.reveal-rating button{background:none;border:none;cursor:pointer;font-size:1.3rem;opacity:.5;transition:all .2s}
+.reveal-rating button.active{opacity:1;transform:scale(1.2)}
+
+.end-req-card{background:linear-gradient(150deg,rgba(42,26,74,.9),rgba(17,12,34,.95));border:1px solid rgba(201,168,76,.2);border-radius:20px;padding:32px 24px;width:100%;max-width:320px;text-align:center}
+.end-req-title{font-family:'Scheherazade New',serif;font-size:1.4rem;color:var(--gold);margin-bottom:12px}
+.end-req-sub{font-size:.82rem;color:rgba(245,239,226,.5);margin-bottom:24px;line-height:1.6}
+.end-req-btns{display:flex;gap:10px}
+
+.results-screen{padding:24px 16px;overflow-y:auto}
+.results-title{font-family:'Scheherazade New',serif;font-size:2rem;color:var(--gold);text-align:center;margin-bottom:6px}
+.results-sub{font-size:.72rem;color:rgba(245,239,226,.3);text-align:center;letter-spacing:3px;margin-bottom:24px}
+.results-scores{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:360px;margin:0 auto 24px}
+.score-card{background:rgba(42,26,74,.4);border:1px solid rgba(201,168,76,.15);border-radius:16px;padding:20px;text-align:center}
+.score-name{font-size:.65rem;color:rgba(245,239,226,.4);letter-spacing:2px;margin-bottom:8px}
+.score-num{font-size:2.5rem;font-weight:900;color:var(--gold)}
+.score-label{font-size:.65rem;color:rgba(245,239,226,.3);margin-top:4px}
+.results-history{width:100%;max-width:360px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.history-item{background:rgba(42,26,74,.3);border:1px solid rgba(201,168,76,.08);border-radius:14px;padding:14px}
+.history-q{font-size:.78rem;color:var(--gold);margin-bottom:8px;font-weight:700}
+.history-answers{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.history-ans{font-size:.75rem;color:rgba(245,239,226,.6);line-height:1.4}
+.history-ans-name{font-size:.6rem;color:rgba(245,239,226,.3);margin-bottom:2px}
+
+.loader{display:inline-block;width:28px;height:28px;border:3px solid rgba(201,168,76,.15);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Screenshot card as normal-flow overlay */
+.sc-faux{min-height:100vh;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:24px;background:rgba(6,5,13,.98)}
+.sc-faux.show{display:flex}
+.sc-inner{background:linear-gradient(150deg,#1e1235,#0d0818);border:1px solid rgba(201,168,76,.3);border-radius:20px;padding:28px;width:100%;max-width:320px;text-align:center}
+.sc-title{font-family:'Scheherazade New',serif;font-size:1.3rem;color:var(--gold);margin-bottom:16px}
+.sc-q{font-size:.82rem;color:rgba(245,239,226,.5);margin-bottom:14px;line-height:1.6}
+.sc-answers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sc-ans{background:rgba(42,26,74,.5);border-radius:12px;padding:12px}
+.sc-ans-name{font-size:.58rem;color:var(--gold);margin-bottom:5px}
+.sc-ans-text{font-size:.85rem;color:var(--cream);font-weight:700}
+
+/* Connection status banner */
+.conn-banner{width:100%;background:rgba(239,68,68,.15);border-bottom:1px solid rgba(239,68,68,.3);padding:6px;text-align:center;font-size:.72rem;color:#fca5a5;display:none}
+.conn-banner.show{display:block}
+
+/* Waiting pulse animation for create screen */
+@keyframes waitPulse{0%,100%{opacity:.5}50%{opacity:1}}
+.waiting-anim{animation:waitPulse 2s infinite}
+
+@media(max-width:360px){.q-text-game{font-size:.95rem}.game-nav{gap:7px}.nav-btn{font-size:.72rem;padding:10px 6px}}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen active" id="homeScreen">
+  <div class="hdr-ornament"><div class="h-line"></div><div class="h-diamond"></div><div class="h-line r"></div></div>
+  <div class="home-title">أنا وانت</div>
+  <div class="home-sub">٢٠٠ سؤال · للمرتبطين</div>
+  <div class="home-btns">
+    <button class="btn-primary" onclick="showCreate()">✦ إنشاء غرفة</button>
+    <button class="btn-secondary" onclick="showJoin()">الانضمام لغرفة</button>
+  </div>
+</div>
+
+<!-- CREATE -->
+<div class="screen" id="createScreen">
+  <button class="back-btn" onclick="goHome()">←</button>
+  <div class="input-card">
+    <div class="input-title">غرفتك الخاصة</div>
+    <div class="input-sub">اكتب اسمك وشارك الكود مع حبيبتك</div>
+    <input class="input-field" id="createName" placeholder="اسمك..." maxlength="20">
+    <button class="btn-primary" style="width:100%;margin-top:8px" onclick="createRoom()">إنشاء الغرفة ✦</button>
+    <div id="createResult" style="margin-top:24px;display:none">
+      <div style="font-size:.7rem;color:rgba(245,239,226,.35);letter-spacing:3px;margin-bottom:8px">كود الغرفة</div>
+      <div class="code-display" id="roomCodeDisplay">----</div>
+      <button class="btn-secondary" style="width:100%;margin-top:8px;font-size:.85rem" onclick="copyCode()">نسخ الكود 📋</button>
+      <div class="status-text waiting-anim"><span id="waitText">بانتظار حبيبتك...</span><span class="status-dot waiting" id="waitDot"></span></div>
+      <div id="waitTimer" style="font-size:.7rem;color:rgba(245,239,226,.2);margin-top:8px;text-align:center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- JOIN -->
+<div class="screen" id="joinScreen">
+  <button class="back-btn" onclick="goHome()">←</button>
+  <div class="input-card">
+    <div class="input-title">انضم للغرفة</div>
+    <div class="input-sub">اكتب اسمك والكود اللي بعثه لك</div>
+    <input class="input-field" id="joinName" placeholder="اسمك..." maxlength="20">
+    <input class="input-field" id="joinCode" placeholder="كود الغرفة" maxlength="4" style="letter-spacing:8px;font-size:1.3rem;font-weight:700" oninput="this.value=this.value.toUpperCase()">
+    <button class="btn-primary" style="width:100%;margin-top:8px" onclick="joinRoom()">دخول ✦</button>
+    <div id="joinLoader" style="display:none;text-align:center;margin-top:16px"><div class="loader"></div></div>
+    <div id="joinError" style="display:none;margin-top:10px;font-size:.82rem;color:#f48fb1;text-align:center"></div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen game-screen" id="gameScreen">
+  <div class="conn-banner" id="connBanner">⚠ انقطع الاتصال — يتم إعادة الاتصال...</div>
+  <div class="game-header">
+    <div class="game-logo">أنا وانت</div>
+    <div class="game-status"><span class="status-dot connected" id="gameStatusDot"></span><span id="gameStatusTxt">متصلين</span></div>
+  </div>
+  <div class="game-body">
+    <div class="points-bar">
+      <div class="point-side"><div class="point-name" id="pName1">أنت</div><div class="point-score" id="pScore1">0</div></div>
+      <div class="point-vs">VS</div>
+      <div class="point-side"><div class="point-name" id="pName2">هي</div><div class="point-score" id="pScore2">0</div></div>
+    </div>
+    <div class="timer-wrap">
+      <div class="timer-circle" id="timerCircle"><span id="timerNum">60</span></div>
+      <span class="timer-paused" id="timerPausedLabel" style="display:none">موقوف</span>
+    </div>
+    <div id="catBadge" class="cat-badge cat-romantic">رومانسي ♥</div>
+    <div class="q-card-game">
+      <div class="q-top-line"></div>
+      <div class="q-num-game" id="qNumGame">السؤال 1</div>
+      <div class="q-text-game" id="qTextGame">...</div>
+      <div class="q-dots-game"><i></i><i></i><i></i></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-text" id="progressText">0 / 200</div>
+    </div>
+    <div class="answers-row">
+      <div class="answer-box">
+        <div class="a-label" id="myLabel">أنت</div>
+        <div class="a-text" id="myAnswerDisplay"><span class="a-waiting">لم تجب بعد</span></div>
+        <div class="rating-row" id="myRating" style="display:none">
+          <button class="rate-btn" onclick="rateAnswer('heart')" id="rateHeart">❤️</button>
+          <button class="rate-btn" onclick="rateAnswer('star')" id="rateStar">⭐</button>
+          <button class="rate-btn" onclick="rateAnswer('wow')" id="rateWow">🤩</button>
+        </div>
+      </div>
+      <div class="answer-box">
+        <div class="a-label" id="partnerLabel">هي</div>
+        <div class="a-text" id="partnerAnswerDisplay"><span class="a-waiting">بانتظارها...</span></div>
+      </div>
+    </div>
+    <div class="answer-input-wrap">
+      <textarea class="answer-input" id="myAnswer" placeholder="إجابتك..." rows="1"></textarea>
+      <button class="send-btn" onclick="sendAnswer()">↑</button>
+    </div>
+    <div class="game-nav">
+      <button class="nav-btn" onclick="prevQ()">◀ السابق</button>
+      <button class="nav-btn random" onclick="randomQ()">عشوائي ✦</button>
+      <button class="nav-btn" onclick="nextQ()">التالي ▶</button>
+    </div>
+    <div class="action-row">
+      <button class="pause-btn" id="pauseBtn" onclick="togglePause()">⏸ إيقاف مؤقت</button>
+      <button class="end-btn" onclick="requestEndGame()">🏁 إنهاء اللعبة</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div class="screen results-screen" id="resultsScreen">
+  <div class="results-title">النتائج ✦</div>
+  <div class="results-sub">جلستكم مع بعض</div>
+  <div class="results-scores">
+    <div class="score-card"><div class="score-name" id="resName1">أنت</div><div class="score-num" id="resScore1">0</div><div class="score-label">نقطة</div></div>
+    <div class="score-card"><div class="score-name" id="resName2">هي</div><div class="score-num" id="resScore2">0</div><div class="score-label">نقطة</div></div>
+  </div>
+  <div class="results-history" id="resultsHistory"></div>
+  <button class="btn-primary" style="margin-top:24px;width:100%;max-width:360px" onclick="goHome()">العودة للبداية ✦</button>
+</div>
+
+<!-- FLOAT BTNS -->
+<div class="float-btns" id="floatBtns">
+  <button class="float-btn fb-music" id="musicBtn" onclick="toggleMusic()">🎵</button>
+  <button class="float-btn fb-night" onclick="toggleNight()">🌙</button>
+  <button class="float-btn fb-chat" id="chatBtn" onclick="toggleChat()">💬</button>
+</div>
+
+<!-- CHAT -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header">
+    <div class="chat-title">✦ دردشة</div>
+    <button class="chat-close" onclick="toggleChat()">✕</button>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input-row">
+    <button class="chat-send" onclick="sendChat()">↑</button>
+    <input class="chat-input" id="chatInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter')sendChat()">
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- REVEAL (overlay-wrap = normal-flow fixed overlay that adds layout height) -->
+<div class="overlay-wrap" id="revealOverlay">
+  <div class="reveal-title">✦ إجاباتكم ✦</div>
+  <div class="reveal-cards">
+    <div class="reveal-card">
+      <div class="reveal-name" id="revealMyName">أنت</div>
+      <div class="reveal-ans" id="revealMyAns">—</div>
+      <div class="reveal-rating">
+        <button onclick="rateReveal('heart')" id="rvHeart">❤️</button>
+        <button onclick="rateReveal('star')" id="rvStar">⭐</button>
+        <button onclick="rateReveal('wow')" id="rvWow">🤩</button>
+      </div>
+    </div>
+    <div class="reveal-card">
+      <div class="reveal-name" id="revealPartnerName">هي</div>
+      <div class="reveal-ans" id="revealPartnerAns">—</div>
+    </div>
+  </div>
+  <button class="btn-secondary" style="font-size:.8rem;padding:10px 24px" onclick="captureCard()">📸 احفظ البطاقة</button>
+  <button class="btn-primary" onclick="closeReveal()">التالي ✦</button>
+</div>
+
+<!-- END REQUEST -->
+<div class="overlay-wrap" id="endRequest" style="z-index:950">
+  <div class="end-req-card">
+    <div class="end-req-title" id="endReqTitle">إنهاء اللعبة؟</div>
+    <div class="end-req-sub" id="endReqSub">الطرف الآخر بيطلب إنهاء اللعبة — هل توافق؟</div>
+    <div class="end-req-btns">
+      <button class="btn-primary" style="flex:1;padding:12px" onclick="acceptEnd()">موافق ✓</button>
+      <button class="btn-secondary" style="flex:1;padding:12px" onclick="rejectEnd()">لا، نكمل</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREENSHOT CARD (uses sc-faux = normal-flow full-screen div) -->
+<div class="sc-faux" id="screenshotCard">
+  <div class="sc-inner" id="scInner">
+    <div class="sc-title">أنا وانت ✦</div>
+    <div class="sc-q" id="scQ"></div>
+    <div class="sc-answers">
+      <div class="sc-ans"><div class="sc-ans-name" id="scName1"></div><div class="sc-ans-text" id="scAns1"></div></div>
+      <div class="sc-ans"><div class="sc-ans-name" id="scName2"></div><div class="sc-ans-text" id="scAns2"></div></div>
+    </div>
+  </div>
+  <p style="font-size:.7rem;color:rgba(245,239,226,.3);margin-top:4px">خذ لقطة شاشة وشاركها ♥</p>
+  <button class="btn-secondary" style="font-size:.8rem;margin-top:8px" onclick="document.getElementById('screenshotCard').classList.remove('show')">إغلاق</button>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// CONFIG — Supabase
+// ══════════════════════════════════════════
+const BASE = 'https://rrbzbxjavdoqnhuytgbi.supabase.co/rest/v1';
+const KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJyYnpieGphdmRvcW5odXl0Z2JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0MzQyODksImV4cCI6MjA5NTAxMDI4OX0.NAaHrAAYIMe8heVBbH8Jd1BwMU_UmMJm65z6nSeSAaM';
+const H    = {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+
+// Supabase Realtime endpoint
+const RT_URL = 'wss://rrbzbxjavdoqnhuytgbi.supabase.co/realtime/v1/websocket?apikey='+KEY+'&vsn=1.0.0';
+
+// ══════════════════════════════════════════
+// HELPERS — safe DB wrappers
+// ══════════════════════════════════════════
+async function dbGet(col,val){
+  try{const r=await fetch(`${BASE}/game_rooms?${col}=eq.${val}&select=*`,{headers:H});if(!r.ok)return[];return await r.json()}
+  catch(e){return[]}
+}
+async function dbInsert(data){
+  try{const r=await fetch(`${BASE}/game_rooms`,{method:'POST',headers:H,body:JSON.stringify(data)});if(!r.ok)return[];return await r.json()}
+  catch(e){return[]}
+}
+async function dbUpdate(col,val,data){
+  try{const r=await fetch(`${BASE}/game_rooms?${col}=eq.${val}`,{method:'PATCH',headers:H,body:JSON.stringify(data)});if(!r.ok)return[];return await r.json()}
+  catch(e){return[]}
+}
+
+// Sanitize user text to avoid XSS
+function safe(str){
+  if(str===null||str===undefined)return'';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ══════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════
+function showToast(msg,dur=3000){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let myName='',partnerName='',roomCode='',roomId=null,isHost=false;
+let currentQ=0,answered=false,gamePaused=false;
+let myPoints=0,partnerPoints=0;
+let usedQuestions=[],gameHistory=[];
+let pollInterval=null,timerInterval=null,waitTimerInterval=null;
+let timerSec=60,questionStartTime=null;
+let musicPlaying=false,audioCtx=null;
+let localChats=[],lastChatLen=0;
+let nightMode=false;
+let boldModeUnlocked=false;
+let realtimeSocket=null;
+let revealShown=false;
+let endRequestShown=false;
+let lastSeenEndRequest=null;
+
+// ══════════════════════════════════════════
+// 200 QUESTIONS
+// ══════════════════════════════════════════
+const questions=[
+{t:"هل مرة حسيت إنك بتحبني بطريقة ما قدرت تشرحها لحتى نفسك؟",c:"r"},
+{t:"شو أول شي لفت نظرك فيّ؟ ولسا نفس الشي؟",c:"r"},
+{t:"لو تكتب لي رسالة ما رح تبعثها، شو بتكتب؟",c:"r"},
+{t:"هل في لحظة صمت بيننا حسيت إنها أحكت أكثر من الكلام؟",c:"r"},
+{t:"شو اللحظة اللي عرفت فيها إنك مش رح تنساني؟",c:"r"},
+{t:"لو تختار مكان واحد نروحه مع بعض، وين بيكون؟",c:"r"},
+{t:"هل حسيت يوم إنك خايف تخسرني؟ كيف كان الإحساس؟",c:"d"},
+{t:"شو أصعب شي قلته لي؟ وكيف حسيت بعده؟",c:"d"},
+{t:"لو تعيد يوم واحد قضيناه مع بعض، أنهو يوم؟",c:"r"},
+{t:"شو الجملة اللي لو قلتها لي رح تغير كل شي بيننا؟",c:"b"},
+{t:"هل في نسخة منك بس أنا شايفها؟",c:"d"},
+{t:"هل رسالة بعثتها لي وندمت إنك ما بعثتها؟",c:"b"},
+{t:"شو اللي بتتمنى إنني كنت أعرفه عنك من البداية؟",c:"d"},
+{t:"لو تصف علاقتنا بلون، أنهو لون وليش؟",c:"r"},
+{t:"هل في لحظة ندمت إنك ما قلت بحبك بوقتها؟",c:"b"},
+{t:"شو اللحظة اللي حسيت فيها إنك بأمان معي؟",c:"r"},
+{t:"هل حاولت تفهمني بطريقة ما انتبهت إنك عم تحاول؟",c:"d"},
+{t:"شو اللي بيخليك تصحى بالصبح وتفكر فيّ؟",c:"r"},
+{t:"لو تكتب عنّا جملة واحدة تلخص كل شي، شو بتكتب؟",c:"r"},
+{t:"هل بتحس إني بحبك بنفس الطريقة اللي بتحتاجها؟",c:"d"},
+{t:"شو الشي اللي بتحس إنه ناقص بيننا وبتتمنى يكون؟",c:"d"},
+{t:"هل في شي صغير بعملو كل يوم وفيه شي منك؟",c:"r"},
+{t:"شو الشي اللي بيخليك تبتسم لما تفكر فينا؟",c:"r"},
+{t:"لو تختار هدية مو مادية تعطيني إياها، شو بتختار؟",c:"r"},
+{t:"شو اللي بتتمنى إني ما أتغير فيه أبدًا؟",c:"r"},
+{t:"هل في خوف مشترك بيننا ما اتكلمنا عنه؟",c:"d"},
+{t:"لو تختار فصل من السنة يمثلنا، أنهو فصل وليش؟",c:"r"},
+{t:"شو أكثر لحظة حسيت فيها أنا وانت ضد العالم؟",c:"b"},
+{t:"هل في جانب من شخصيتك بس ظهر بعد ما عرفتني؟",c:"d"},
+{t:"لو تختار مشهد من فيلم يمثل علاقتنا، أنهو مشهد؟",c:"r"},
+{t:"شو اللي بتتمنى يصير بيننا بعد خمس سنين؟",c:"d"},
+{t:"هل بتحس إني بفهمك من نظرتك بدون ما تحكي؟",c:"r"},
+{t:"شو الشي اللي بتعمله لما تشتاقلي وما تقدر تشوفني؟",c:"r"},
+{t:"لو تختار كلمة وصف فيها حبك إلي، شو بتختار؟",c:"r"},
+{t:"هل في طريقة بتحب فيها أعبر عن حبي إلك؟",c:"b"},
+{t:"شو أصعب وداع مررنا فيه حتى لو كان لفترة قصيرة؟",c:"d"},
+{t:"هل في حلم شاركتني فيه ولسا بتفكر فيه؟",c:"r"},
+{t:"شو الشي اللي بتحس إنه بيربطنا أكثر من أي شي ثاني؟",c:"d"},
+{t:"لو تحكي لأهلك عني بجملة واحدة، شو بتقول؟",c:"b"},
+{t:"شو أكثر شي بيخليك تحس إنك مرتاح معي؟",c:"r"},
+{t:"هل حسيت يوم إنك بتحبني بصمت أكثر مما بتعبر؟",c:"d"},
+{t:"شو اللي بيخليك تحس إنك محظوظ إننا التقينا؟",c:"r"},
+{t:"هل في خطة مشتركة بتتمنى ما تتأجل؟",c:"d"},
+{t:"هل في جملة قلتها لك يوم ولسا عايشة معك؟",c:"r"},
+{t:"شو اللحظة اللي حسيت فيها إننا أصحاب قبل ما نكون أي شي ثاني؟",c:"r"},
+{t:"هل في شي بتتمنى إني كنت سألتك عنه قبل؟",c:"d"},
+{t:"هل مرة استقصدت تخليني اغار؟",c:"b"},
+{t:"شو الشي اللي بتحس إنك ما قدرت تشرحه لي لحد هلق؟",c:"d"},
+{t:"لو تكتب لي رسالة تفتحها بعد عشر سنين، شو بتكتب؟",c:"r"},
+{t:"شو اللي بيخليك تحس إنك مهتم فيّ أكثر من أي وقت؟",c:"r"},
+{t:"هل في صورة إلنا ببالك بتتمنى تلتقطها؟",c:"r"},
+{t:"شو اللحظة اللي حسيت فيها إنك فاهمني أكثر من أي أحد؟",c:"d"},
+{t:"لو تصف علاقتنا بأغنية، أنهي أغنية؟",c:"r"},
+{t:"هل في شي بتخاف تسألني عنه؟",c:"b"},
+{t:"شو أكثر شي بيخليك تحس إنك مرتبط فيّ بطريقة ما تفسرها؟",c:"d"},
+{t:"هل في لحظة غضب مني ولسا عندك أثر منها بقلبك؟",c:"b"},
+{t:"شو اللحظة اللي حسيت فيها إنك شايف روحك بعيوني؟",c:"r"},
+{t:"لو تختار وقت من اليوم يمثل علاقتنا، شو بتختار؟",c:"r"},
+{t:"هل في شي تعلمته مني غير ما كنت تتوقعه؟",c:"d"},
+{t:"شو اللحظة اللي حسيت فيها إنك بتحبني بكل جوارحك؟",c:"r"},
+{t:"هل بتحس إن في لغة بيننا بس إحنا نفهمها؟",c:"r"},
+{t:"شو أكثر شي بتشتاقله مني لما ما نكون مع بعض؟",c:"r"},
+{t:"هل في شي صغير بتعمله بسببي وما بتعترف فيه؟",c:"b"},
+{t:"لو تلخص كل اللي بيننا بكلمة واحدة فقط، شو بتقول؟",c:"r"},
+// DEEP
+{t:"شو أكثر شي بيخيفك بخصوص المستقبل؟",c:"d"},
+{t:"لو كان في شي واحد بتتمنى تغيره بنفسك، شو بيكون؟",c:"d"},
+{t:"شو الشي اللي بيخليك تحس إنك ناجح بحياتك؟",c:"d"},
+{t:"هل في قرار اتخذته وندمت عليه لحد هلق؟",c:"d"},
+{t:"شو أصعب درس تعلمته بحياتك؟",c:"d"},
+{t:"لو تعطي نصيحة لنفسك من ١٠ سنين، شو بتقول؟",c:"d"},
+{t:"شو الشي اللي بتحس إنك ما وصلتله لسا؟",c:"d"},
+{t:"هل في شخص غير علاقتك بنفسك؟ مين وكيف؟",c:"d"},
+{t:"شو أكثر شي بتتمنى الناس تفهمه عنك؟",c:"d"},
+{t:"لو تصف نفسك بثلاث كلمات، شو بتختار؟",c:"d"},
+{t:"شو الشي اللي بيعطيك قوة لما كل شي بيصير صعب؟",c:"d"},
+{t:"هل في شي كنت خايفه وخضته وفخرت بنفسك؟",c:"d"},
+{t:"شو الحلم اللي دايم بترجع له بذهنك؟",c:"d"},
+{t:"لو ما كان في أي قيد، كيف كانت حياتك رح تكون؟",c:"d"},
+{t:"شو أكثر شي بتشكر عليه بحياتك هلق؟",c:"d"},
+{t:"هل في شي بتحب تعمله لحالك وما تشاركه مع أحد؟",c:"d"},
+{t:"شو الكتاب أو الفيلم اللي غير طريقة تفكيرك؟",c:"d"},
+{t:"لو تلتقي بنسخة منك من المستقبل، شو بتسأله؟",c:"d"},
+{t:"شو الشي اللي بتتمنى تكون أفضل فيه؟",c:"d"},
+{t:"هل في شي بتحبه بنفسك ما بتقوله لأحد؟",c:"d"},
+// BOLD
+{t:"شو أكثر شي جريء فعلته بسببي؟",c:"b"},
+{t:"هل في لحظة حسيت إني بدي أكون أقرب منك مما نحن عليه؟",c:"b"},
+{t:"شو الشي اللي بتخجل تقوله وانت بتحبني؟",c:"b"},
+{t:"لو ما كان في أحد حولنا، كيف كنت رح تعبر عن حبك؟",c:"b"},
+{t:"شو أكثر لحظة قربت منك فيها بشكل ما توقعته؟",c:"b"},
+{t:"هل في شي بتتمنى تقوله لي بس الكلمات ما بتكفي؟",c:"b"},
+{t:"شو الشي اللي بيخليك تحس إني بس إلك؟",c:"b"},
+{t:"لو تجرأ تعمل شي ما عملته قبل معي، شو بيكون؟",c:"b"},
+{t:"هل في لحظة حسيت إن الدنيا بس إحنا فيها؟",c:"b"},
+{t:"شو أكثر كلمة بتحب تسمعها مني؟",c:"b"},
+// NIGHT
+{t:"لو الليل طال، وين بتتمنى تكون هلق؟",c:"n"},
+{t:"شو أجمل ذكرى عندك معي بوقت ليلي؟",c:"n"},
+{t:"لو نشوف نجوم مع بعض، شو بتحكيني؟",c:"n"},
+{t:"شو اللي بتفكر فيه آخر شي قبل ما تنام؟",c:"n"},
+{t:"لو الليل ما خلص، كيف كنت رح تقضيه معي؟",c:"n"},
+{t:"شو أكثر حلم بتتمنى يتحقق بيننا؟",c:"n"},
+{t:"هل بتحس إن الليل بيخلينا أقرب من بعض؟",c:"n"},
+{t:"لو تكتب أغنية عنا، شو بتكون كلماتها؟",c:"n"},
+{t:"شو الشي اللي بتتمنى تهمسه لي بالليل؟",c:"n"},
+{t:"لو نجمة سقطت هلق، شو بتتمنى؟",c:"n"},
+// MORE ROMANTIC
+{t:"شو أول شي لاحظته بطريقة مشيتي؟",c:"r"},
+{t:"هل في لحظة حسيت إن ابتسامتي غيرت يومك؟",c:"r"},
+{t:"شو الشي اللي بتحب تعمله إلي بدون ما تقول شي؟",c:"r"},
+{t:"لو تختار عطر يمثلني، أيه بيكون؟",c:"r"},
+{t:"شو أكثر شي بتفتقده فيّ لما تكون بعيد؟",c:"r"},
+{t:"هل في لحظة بكيت بسببي؟ من الفرح أو الحزن؟",c:"d"},
+{t:"شو الشي اللي بيخليك تحس إني بيتك؟",c:"r"},
+{t:"لو تبعثلي رسالة صوتية هلق، شو بتقول؟",c:"r"},
+{t:"شو أجمل كلمة قلتها لي وما نسيتها؟",c:"r"},
+{t:"هل بتحس إن حبنا بيكبر كل يوم؟ كيف؟",c:"r"},
+{t:"شو الشي اللي تغير فيك بعد ما عرفتني؟",c:"d"},
+{t:"لو تختار صورة تمثلنا، شو بتوصفها؟",c:"r"},
+{t:"شو أكثر شي بتحب تعمله معي؟",c:"r"},
+{t:"هل في لحظة حسيت إن الوقت وقف وانت معي؟",c:"r"},
+{t:"شو الشي اللي بتتمنى نبدأه مع بعض؟",c:"d"},
+{t:"لو تكتب عنوان لقصتنا، شو بتختار؟",c:"r"},
+{t:"شو أكثر شي أدهشك فيّ؟",c:"r"},
+{t:"هل في شي بتعمله عشاني وما تقوله؟",c:"b"},
+{t:"شو اللي بتحب تسمعه مني كل يوم؟",c:"r"},
+{t:"لو تعطيني هدية من قلبك، شو بتختار؟",c:"r"},
+{t:"شو أكثر لحظة حسيت فيها إنك محظوظ؟",c:"r"},
+{t:"هل في وعد بتتمنى نحافظ عليه دايما؟",c:"d"},
+{t:"شو الشي اللي بيربطنا أكثر من الكلام؟",c:"d"},
+{t:"لو تصف حبك إلي بمشهد طبيعي، شو بتختار؟",c:"r"},
+{t:"شو أكثر شي بتحب يبقى ثابت بيننا؟",c:"r"},
+{t:"هل في ذكرى بتبتسم كل ما تفكر فيها؟",c:"r"},
+{t:"شو الشي اللي تعلمته من حبنا؟",c:"d"},
+{t:"لو تعطيني نجمة، أيه نجمة وليش؟",c:"r"},
+{t:"شو أكثر شي بتحب بطريقة حبي إلك؟",c:"r"},
+{t:"هل في لحظة حسيت إن كل شي كان يستاهل عشانك؟",c:"r"},
+// MORE DEEP
+{t:"شو الشي اللي بيخليك تحس إنك بخير؟",c:"d"},
+{t:"لو تغير شي واحد بالعالم، شو بيكون؟",c:"d"},
+{t:"شو أكثر شي تعلمته من علاقاتك بالناس؟",c:"d"},
+{t:"هل في شخص بتتمنى تصالحه؟",c:"d"},
+{t:"شو الشي اللي بتفخر فيه أكثر شي بحياتك؟",c:"d"},
+{t:"لو تعيد ١٠ سنين، شو كنت بتغير؟",c:"d"},
+{t:"شو أكثر شي بيعلمك الصبر؟",c:"d"},
+{t:"هل في حلم تركته وتمنيت ما تركته؟",c:"d"},
+{t:"شو الشي اللي بيخليك تحس إنك بالمكان الصح؟",c:"d"},
+{t:"لو تكتب وصيتك لنفسك، شو بتكتب؟",c:"d"},
+{t:"شو أكثر شي بتقدر تعطيه للناس؟",c:"d"},
+{t:"هل في فكرة بتخاف تشاركها مع أحد؟",c:"d"},
+{t:"شو الشي اللي بتتمنى الناس تتذكرك فيه؟",c:"d"},
+{t:"لو تختار كيف تقضي آخر يوم بحياتك، كيف بيكون؟",c:"d"},
+{t:"شو أكثر شي بيعطيك أمل؟",c:"d"},
+// MORE BOLD
+{t:"شو الشي اللي بتتمنى تجرأ تقوله؟",c:"b"},
+{t:"هل في لحظة حسيت إنك بدك تكون أقرب مما أنتم عليه؟",c:"b"},
+{t:"شو أكثر شي جريء فكرت فيه بخصوصنا؟",c:"b"},
+{t:"لو ما كان في حدود، شو كنت بتعمل؟",c:"b"},
+{t:"شو الشي اللي بيخليك تخجل وأنت بتفكر فيّ؟",c:"b"},
+{t:"هل في شي بتخاف تعترف فيه؟",c:"b"},
+{t:"شو أكثر لحظة أحرجتني فيها وفرحت؟",c:"b"},
+{t:"لو تبعثلي رسالة جريئة، شو بتكتب؟",c:"b"},
+{t:"شو الشي اللي بتتمنى أعرفه عنك بس ما تقوله؟",c:"b"},
+{t:"هل في لحظة حسيت إن حبك إلي أكبر من الكلام؟",c:"b"},
+// MORE NIGHT
+{t:"شو أجمل شي بتشوفه بالليل يذكرك فيّ؟",c:"n"},
+{t:"لو نجلس بالليل بدون تلفون، عن شو منحكي؟",c:"n"},
+{t:"شو الشي اللي بتتمنى أسمعه منك قبل النوم؟",c:"n"},
+{t:"هل في أغنية بتسمعها بالليل وتفكر فيّ؟",c:"n"},
+{t:"لو الليلة ما فيها غد، كيف كنت بتقضيها؟",c:"n"},
+{t:"شو أجمل كلمة تقولها لي تحت النجوم؟",c:"n"},
+{t:"هل بتحلم فيّ؟ شو بتحلم؟",c:"n"},
+{t:"لو تختار مكان نجلس فيه بالليل، وين؟",c:"n"},
+{t:"شو اللي بيخليك تحس إن الليل حلو معي؟",c:"n"},
+{t:"لو الليل كلمك، شو بيقلك عنّا؟",c:"n"},
+];
+
+const catLabels={r:'رومانسي ♥',d:'عميق ✦',b:'جريء 🔥',n:'ليلي 🌙'};
+const catClasses={r:'cat-romantic',d:'cat-deep',b:'cat-bold',n:'cat-night'};
+
+// ══════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goHome(){stopAll();showScreen('homeScreen')}
+function showCreate(){showScreen('createScreen')}
+function showJoin(){showScreen('joinScreen')}
+
+function stopAll(){
+  if(pollInterval){clearInterval(pollInterval);pollInterval=null}
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  if(waitTimerInterval){clearInterval(waitTimerInterval);waitTimerInterval=null}
+  closeRealtime();
+  stopMusic();
+  document.getElementById('floatBtns').classList.remove('show');
+  document.getElementById('chatPanel').classList.remove('open');
+  document.getElementById('revealOverlay').classList.remove('show');
+  document.getElementById('endRequest').classList.remove('show');
+  revealShown=false;endRequestShown=false;lastSeenEndRequest=null;
+}
+
+// ══════════════════════════════════════════
+// REALTIME (WebSocket)
+// ══════════════════════════════════════════
+function connectRealtime(onUpdate){
+  if(realtimeSocket&&realtimeSocket.readyState<2)return;
+  try{
+    realtimeSocket=new WebSocket(RT_URL);
+    realtimeSocket.onopen=()=>{
+      setConnStatus(true);
+      // Subscribe to the game_rooms table changes for this room
+      const sub={topic:`realtime:public:game_rooms:id=eq.${roomId}`,event:'phx_join',payload:{config:{broadcast:{self:true},presence:{key:''},postgres_changes:[{event:'UPDATE',schema:'public',table:'game_rooms',filter:`id=eq.${roomId}`}]}},ref:'1'};
+      realtimeSocket.send(JSON.stringify(sub));
+      // Heartbeat every 25s
+      realtimeSocket._hb=setInterval(()=>{
+        if(realtimeSocket.readyState===1)realtimeSocket.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:'hb'}));
+      },25000);
+    };
+    realtimeSocket.onmessage=(e)=>{
+      try{
+        const msg=JSON.parse(e.data);
+        if(msg.event==='postgres_changes'&&msg.payload&&msg.payload.data){
+          onUpdate(msg.payload.data.record);
+        }
+      }catch(err){}
+    };
+    realtimeSocket.onclose=()=>{
+      setConnStatus(false);
+      clearInterval(realtimeSocket._hb);
+      // Reconnect after 3s if game still active
+      if(roomId)setTimeout(()=>connectRealtime(onUpdate),3000);
+    };
+    realtimeSocket.onerror=()=>{setConnStatus(false)};
+  }catch(e){
+    // Fallback to polling if WebSocket not supported
+    startPollingFallback(onUpdate);
+  }
+}
+
+function closeRealtime(){
+  if(realtimeSocket){
+    clearInterval(realtimeSocket._hb);
+    realtimeSocket.onclose=null;
+    realtimeSocket.close();
+    realtimeSocket=null;
+  }
+  roomId=null;
+}
+
+function setConnStatus(connected){
+  const dot=document.getElementById('gameStatusDot');
+  const txt=document.getElementById('gameStatusTxt');
+  const banner=document.getElementById('connBanner');
+  if(!dot)return;
+  if(connected){
+    dot.className='status-dot connected';
+    txt.textContent='متصلين';
+    banner.classList.remove('show');
+  } else {
+    dot.className='status-dot waiting';
+    txt.textContent='يتصل...';
+    banner.classList.add('show');
+  }
+}
+
+// Fallback polling if WS fails (every 3s instead of 2s to be lighter)
+function startPollingFallback(onUpdate){
+  if(pollInterval)return;
+  pollInterval=setInterval(async()=>{
+    if(!roomId)return;
+    const rows=await dbGet('id',roomId);
+    if(rows&&rows[0])onUpdate(rows[0]);
+  },3000);
+}
+
+// ══════════════════════════════════════════
+// CREATE / JOIN
+// ══════════════════════════════════════════
+async function createRoom(){
+  const name=document.getElementById('createName').value.trim();
+  if(!name){showToast('اكتب اسمك أولاً');return}
+  myName=sanitizeName(name);isHost=true;
+  roomCode=Math.floor(1000+Math.random()*9000).toString();
+  // Clean old rooms older than 24h
+  cleanOldRooms();
+  try{
+    const rows=await dbInsert({code:roomCode,host_name:myName,guest_name:null,current_q:0,host_answer:null,guest_answer:null,status:'waiting',chat_log:'[]',end_request:null,host_points:0,guest_points:0,question_start:null});
+    if(rows&&rows[0]){
+      roomId=rows[0].id;
+    } else {
+      await new Promise(r=>setTimeout(r,800));
+      const check=await dbGet('code',roomCode);
+      if(check&&check[0])roomId=check[0].id;
+      else{showToast('حصل خطأ، جرب مرة ثانية');return}
+    }
+    document.getElementById('createResult').style.display='block';
+    document.getElementById('roomCodeDisplay').textContent=roomCode;
+    startWaitCountdown();
+    startPollingForGuest();
+  }catch(e){showToast('خطأ: '+e.message)}
+}
+
+function sanitizeName(n){return n.replace(/[<>"'&]/g,'').trim().slice(0,20)||'مجهول'}
+
+function startWaitCountdown(){
+  let secs=0;
+  const el=document.getElementById('waitTimer');
+  waitTimerInterval=setInterval(()=>{
+    secs++;
+    const m=String(Math.floor(secs/60)).padStart(2,'0');
+    const s=String(secs%60).padStart(2,'0');
+    el.textContent='وقت الانتظار: '+m+':'+s;
+  },1000);
+}
+
+function copyCode(){
+  if(navigator.clipboard)navigator.clipboard.writeText(roomCode);
+  showToast('تم نسخ الكود! 📋');
+}
+
+function startPollingForGuest(){
+  if(pollInterval){clearInterval(pollInterval);pollInterval=null}
+  pollInterval=setInterval(async()=>{
+    const rows=await dbGet('id',roomId);
+    if(rows&&rows[0]&&rows[0].guest_name){
+      partnerName=rows[0].guest_name;
+      clearInterval(pollInterval);pollInterval=null;
+      if(waitTimerInterval){clearInterval(waitTimerInterval);waitTimerInterval=null}
+      document.getElementById('waitText').textContent=`${partnerName} انضمت! 🎉`;
+      document.getElementById('waitDot').className='status-dot connected';
+      showToast(`مرحباً ${partnerName}! 🎉`);
+      setTimeout(startGame,1000);
+    }
+  },2000);
+}
+
+async function joinRoom(){
+  const name=document.getElementById('joinName').value.trim();
+  const code=document.getElementById('joinCode').value.trim();
+  if(!name||!code){showToast('اكتب اسمك والكود');return}
+  myName=sanitizeName(name);isHost=false;roomCode=code;
+  document.getElementById('joinLoader').style.display='block';
+  document.getElementById('joinError').style.display='none';
+  const rows=await dbGet('code',code);
+  if(!rows||!rows[0]||rows[0].status==='ended'){
+    document.getElementById('joinLoader').style.display='none';
+    document.getElementById('joinError').style.display='block';
+    document.getElementById('joinError').textContent='الكود غلط أو الغرفة مش موجودة';
+    return;
+  }
+  if(rows[0].guest_name&&rows[0].guest_name!==myName){
+    document.getElementById('joinLoader').style.display='none';
+    document.getElementById('joinError').style.display='block';
+    document.getElementById('joinError').textContent='الغرفة ممتلئة';
+    return;
+  }
+  roomId=rows[0].id;partnerName=rows[0].host_name;
+  await dbUpdate('id',roomId,{guest_name:myName,status:'playing'});
+  document.getElementById('joinLoader').style.display='none';
+  startGame();
+}
+
+// Clean rooms older than 24h (fire and forget)
+async function cleanOldRooms(){
+  try{
+    const cutoff=new Date(Date.now()-24*3600*1000).toISOString();
+    await fetch(`${BASE}/game_rooms?created_at=lt.${cutoff}`,{method:'DELETE',headers:H});
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════
+// GAME
+// ══════════════════════════════════════════
+function startGame(){
+  currentQ=0;answered=false;gamePaused=false;
+  myPoints=0;partnerPoints=0;usedQuestions=[];gameHistory=[];
+  boldModeUnlocked=false;localChats=[];lastChatLen=0;
+  revealShown=false;endRequestShown=false;lastSeenEndRequest=null;
+
+  document.getElementById('myLabel').textContent=myName;
+  document.getElementById('partnerLabel').textContent=partnerName;
+  document.getElementById('revealMyName').textContent=myName;
+  document.getElementById('revealPartnerName').textContent=partnerName;
+  document.getElementById('pName1').textContent=myName;
+  document.getElementById('pName2').textContent=partnerName;
+  document.getElementById('resName1').textContent=myName;
+  document.getElementById('resName2').textContent=partnerName;
+
+  showScreen('gameScreen');
+  document.getElementById('floatBtns').classList.add('show');
+  loadQuestion();
+  // Connect realtime; fallback to polling inside connectRealtime
+  connectRealtime(handleRoomUpdate);
+  // Also do one immediate poll to get current state
+  setTimeout(async()=>{
+    const rows=await dbGet('id',roomId);
+    if(rows&&rows[0])handleRoomUpdate(rows[0]);
+  },500);
+  startMusicAuto();
+}
+
+function loadQuestion(skipTimerReset=false){
+  const q=questions[currentQ];
+  document.getElementById('qNumGame').textContent='السؤال '+(currentQ+1);
+  document.getElementById('qTextGame').textContent=q.t;
+  const badge=document.getElementById('catBadge');
+  badge.textContent=catLabels[q.c];
+  badge.className='cat-badge '+catClasses[q.c];
+  document.getElementById('progressFill').style.width=((currentQ+1)/200*100)+'%';
+  document.getElementById('progressText').textContent=(currentQ+1)+' / 200';
+  document.getElementById('myAnswer').value='';
+  document.getElementById('myAnswer').disabled=false;
+  document.querySelector('.send-btn').disabled=false;
+  document.getElementById('myAnswerDisplay').innerHTML='<span class="a-waiting">لم تجب بعد</span>';
+  document.getElementById('partnerAnswerDisplay').innerHTML='<span class="a-waiting">بانتظارها...</span>';
+  document.getElementById('myRating').style.display='none';
+  answered=false;revealShown=false;
+  if(!skipTimerReset)resetTimer();
+  // Notify bold unlock
+  if(!boldModeUnlocked&&usedQuestions.length>=10){
+    boldModeUnlocked=true;
+    showToast('🔥 تم فتح الأسئلة الجريئة!',4000);
+  }
+}
+
+// ══════════════════════════════════════════
+// ROOM UPDATE HANDLER (Realtime + Polling)
+// ══════════════════════════════════════════
+function handleRoomUpdate(room){
+  if(!room)return;
+
+  // Sync question index from DB
+  if(room.current_q!==currentQ){
+    currentQ=room.current_q;
+    if(!usedQuestions.includes(currentQ))usedQuestions.push(currentQ);
+    loadQuestion();
+    return;
+  }
+
+  // Sync answers
+  const myAns   = isHost ? room.host_answer : room.guest_answer;
+  const pAns    = isHost ? room.guest_answer : room.host_answer;
+
+  if(myAns){
+    document.getElementById('myAnswerDisplay').textContent=myAns;
+    document.getElementById('myRating').style.display='flex';
+  }
+  if(pAns){
+    document.getElementById('partnerAnswerDisplay').textContent=pAns;
+  }
+
+  // Sync points from DB (source of truth)
+  const dbMyPts   = isHost ? (room.host_points||0) : (room.guest_points||0);
+  const dbPtsPar  = isHost ? (room.guest_points||0) : (room.host_points||0);
+  if(dbMyPts!==myPoints||dbPtsPar!==partnerPoints){
+    myPoints=dbMyPts;partnerPoints=dbPtsPar;
+    document.getElementById('pScore1').textContent=myPoints;
+    document.getElementById('pScore2').textContent=partnerPoints;
+  }
+
+  // Stop timer when both answered
+  if(myAns&&pAns&&timerInterval){
+    clearInterval(timerInterval);timerInterval=null;
+  }
+
+  // Show reveal when both answered
+  if(myAns&&pAns&&!revealShown){
+    revealShown=true;
+    document.getElementById('revealMyAns').textContent=myAns;
+    document.getElementById('revealPartnerAns').textContent=pAns;
+    document.getElementById('revealOverlay').classList.add('show');
+    gameHistory.push({q:questions[currentQ].t,myAns,partnerAns:pAns});
+    // Award point in DB
+    awardPoint();
+  }
+
+  // Sync timer from DB start time
+  if(room.question_start&&!gamePaused){
+    const elapsed=Math.floor((Date.now()-new Date(room.question_start).getTime())/1000);
+    const remaining=Math.max(0,60-elapsed);
+    if(Math.abs(remaining-timerSec)>3){timerSec=remaining;updateTimerUI()}
+  }
+
+  // Chat sync
+  if(room.chat_log){
+    try{
+      const chats=JSON.parse(room.chat_log);
+      if(chats.length!==lastChatLen){
+        lastChatLen=chats.length;localChats=chats;
+        renderChat(chats);
+        if(!document.getElementById('chatPanel').classList.contains('open')){
+          document.getElementById('chatBtn').classList.add('unread');
+        }
+      }
+    }catch(e){}
+  }
+
+  // End request
+  const er=room.end_request;
+  if(er&&er!==myName&&er!=='accepted'&&er!=='rejected'&&er!==lastSeenEndRequest){
+    lastSeenEndRequest=er;
+    showEndRequest(er);
+  }
+  if(er==='accepted'&&document.getElementById('gameScreen').classList.contains('active')){
+    showResults();
+  }
+}
+
+async function awardPoint(){
+  // Increment my points in DB atomically
+  const field=isHost?'host_points':'guest_points';
+  const rows=await dbGet('id',roomId);
+  if(rows&&rows[0]){
+    const cur=rows[0][field]||0;
+    await dbUpdate('id',roomId,{[field]:cur+1});
+  }
+}
+
+// ══════════════════════════════════════════
+// TIMER — synced via DB question_start
+// ══════════════════════════════════════════
+function resetTimer(){
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  timerSec=60;updateTimerUI();
+  // Host sets the question start time in DB
+  if(isHost){
+    const now=new Date().toISOString();
+    dbUpdate('id',roomId,{question_start:now});
+    questionStartTime=new Date(now);
+  }
+  if(!gamePaused)startTimer();
+}
+
+function startTimer(){
+  timerInterval=setInterval(()=>{
+    if(gamePaused)return;
+    timerSec=Math.max(0,timerSec-1);
+    updateTimerUI();
+    if(timerSec<=0){
+      clearInterval(timerInterval);timerInterval=null;
+      if(!answered){
+        document.getElementById('myAnswer').disabled=true;
+        document.querySelector('.send-btn').disabled=true;
+        showToast('انتهى الوقت! ⏰');
+      }
+    }
+  },1000);
+}
+
+function updateTimerUI(){
+  const el=document.getElementById('timerNum');
+  const circle=document.getElementById('timerCircle');
+  el.textContent=timerSec;
+  const deg=Math.round((timerSec/60)*360);
+  const color=timerSec>20?'var(--gold)':timerSec>10?'#f59e0b':'#ef4444';
+  circle.style.background=`conic-gradient(${color} ${deg}deg,rgba(255,255,255,.06) ${deg}deg)`;
+  el.style.color=color;
+}
+
+function togglePause(){
+  gamePaused=!gamePaused;
+  const btn=document.getElementById('pauseBtn');
+  const label=document.getElementById('timerPausedLabel');
+  if(gamePaused){
+    if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+    btn.textContent='▶ استئناف';label.style.display='inline';
+    document.getElementById('myAnswer').disabled=true;
+    document.querySelector('.send-btn').disabled=true;
+  } else {
+    btn.textContent='⏸ إيقاف مؤقت';label.style.display='none';
+    document.getElementById('myAnswer').disabled=false;
+    document.querySelector('.send-btn').disabled=false;
+    startTimer();
+  }
+}
+
+// ══════════════════════════════════════════
+// ANSWERS
+// ══════════════════════════════════════════
+async function sendAnswer(){
+  const inp=document.getElementById('myAnswer');
+  const ans=inp.value.trim();
+  if(!ans||answered)return;
+  answered=true;
+  document.getElementById('myAnswerDisplay').textContent=ans;
+  document.getElementById('myRating').style.display='flex';
+  inp.disabled=true;
+  document.querySelector('.send-btn').disabled=true;
+  const field=isHost?{host_answer:ans}:{guest_answer:ans};
+  await dbUpdate('id',roomId,field);
+}
+
+// ══════════════════════════════════════════
+// QUESTION NAVIGATION
+// ══════════════════════════════════════════
+function changeQ(newQ){
+  if(newQ<0||newQ>199)return;
+  currentQ=newQ;
+  if(!usedQuestions.includes(currentQ))usedQuestions.push(currentQ);
+  loadQuestion();
+  dbUpdate('id',roomId,{current_q:currentQ,host_answer:null,guest_answer:null,question_start:null});
+}
+
+function nextQ(){changeQ(currentQ<199?currentQ+1:0)}
+function prevQ(){changeQ(currentQ>0?currentQ-1:0)}
+function randomQ(){
+  let pool=[...Array(200).keys()].filter(i=>{
+    if(!boldModeUnlocked&&questions[i].c==='b')return false;
+    return !usedQuestions.includes(i);
+  });
+  if(pool.length===0){
+    usedQuestions=[];
+    pool=[...Array(200).keys()].filter(i=>boldModeUnlocked||questions[i].c!=='b');
+    showToast('تم تجديد الأسئلة! ✨');
+  }
+  changeQ(pool[Math.floor(Math.random()*pool.length)]);
+}
+
+// ══════════════════════════════════════════
+// REVEAL
+// ══════════════════════════════════════════
+function closeReveal(){
+  document.getElementById('revealOverlay').classList.remove('show');
+  // Reset answers for next question (don't auto-advance — let them choose)
+  dbUpdate('id',roomId,{host_answer:null,guest_answer:null});
+}
+
+function rateReveal(type){
+  const map={heart:'rvHeart',star:'rvStar',wow:'rvWow'};
+  Object.values(map).forEach(id=>{const b=document.getElementById(id);if(b){b.style.opacity='.5';b.style.transform='scale(1)'}});
+  const btn=document.getElementById(map[type]);
+  if(btn){btn.style.opacity='1';btn.style.transform='scale(1.3)'}
+}
+
+function captureCard(){
+  const q=questions[currentQ].t;
+  const myAns=document.getElementById('revealMyAns').textContent;
+  const partnerAns=document.getElementById('revealPartnerAns').textContent;
+  document.getElementById('scQ').textContent=q;
+  document.getElementById('scName1').textContent=myName;
+  document.getElementById('scAns1').textContent=myAns;
+  document.getElementById('scName2').textContent=partnerName;
+  document.getElementById('scAns2').textContent=partnerAns;
+  document.getElementById('screenshotCard').classList.add('show');
+}
+
+// ══════════════════════════════════════════
+// END GAME
+// ══════════════════════════════════════════
+function requestEndGame(){
+  if(!confirm('بدك تطلب إنهاء اللعبة؟'))return;
+  dbUpdate('id',roomId,{end_request:myName});
+  showToast('تم إرسال طلب الإنهاء... بانتظار موافقة الطرف الثاني');
+}
+
+function showEndRequest(requester){
+  if(endRequestShown)return;
+  endRequestShown=true;
+  document.getElementById('endReqTitle').textContent='طلب إنهاء اللعبة';
+  document.getElementById('endReqSub').textContent=`${safe(requester)} يطلب إنهاء اللعبة — هل توافق؟`;
+  document.getElementById('endRequest').classList.add('show');
+}
+
+async function acceptEnd(){
+  document.getElementById('endRequest').classList.remove('show');
+  endRequestShown=false;
+  await dbUpdate('id',roomId,{end_request:'accepted',status:'ended'});
+  showResults();
+}
+
+function rejectEnd(){
+  document.getElementById('endRequest').classList.remove('show');
+  endRequestShown=false;lastSeenEndRequest=null;
+  dbUpdate('id',roomId,{end_request:'rejected'});
+  showToast('رفضت الإنهاء — تكملون! 💪');
+}
+
+function showResults(){
+  stopAll();
+  document.getElementById('resScore1').textContent=myPoints;
+  document.getElementById('resScore2').textContent=partnerPoints;
+  const hist=document.getElementById('resultsHistory');
+  hist.innerHTML='';
+  gameHistory.forEach(h=>{
+    const div=document.createElement('div');
+    div.className='history-item';
+    const qDiv=document.createElement('div');qDiv.className='history-q';qDiv.textContent=h.q;
+    const ansRow=document.createElement('div');ansRow.className='history-answers';
+    const a1=document.createElement('div');a1.className='history-ans';
+    const n1=document.createElement('div');n1.className='history-ans-name';n1.textContent=myName;
+    a1.appendChild(n1);a1.appendChild(document.createTextNode(h.myAns));
+    const a2=document.createElement('div');a2.className='history-ans';
+    const n2=document.createElement('div');n2.className='history-ans-name';n2.textContent=partnerName;
+    a2.appendChild(n2);a2.appendChild(document.createTextNode(h.partnerAns));
+    ansRow.appendChild(a1);ansRow.appendChild(a2);
+    div.appendChild(qDiv);div.appendChild(ansRow);
+    hist.appendChild(div);
+  });
+  showScreen('resultsScreen');
+}
+
+// ══════════════════════════════════════════
+// MUSIC
+// ══════════════════════════════════════════
+function startMusicAuto(){musicPlaying=true;setTimeout(playLoop,300)}
+
+function playLoop(){
+  if(!musicPlaying)return;
+  try{
+    if(!audioCtx||audioCtx.state==='closed')audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    const melody=[
+      {f:392,d:.9},{f:440,d:.45},{f:494,d:.45},{f:523,d:1.35},
+      {f:494,d:.45},{f:440,d:.45},{f:392,d:.9},{f:349,d:1.35},
+      {f:330,d:.9},{f:349,d:.45},{f:392,d:.45},{f:440,d:1.35},
+      {f:392,d:.9},{f:349,d:.45},{f:330,d:.45},{f:294,d:1.8},
+    ];
+    let t=audioCtx.currentTime+.05;
+    melody.forEach(({f,d})=>{
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.connect(g);g.connect(audioCtx.destination);
+      o.type='sine';o.frequency.value=f;
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.09,t+.06);g.gain.exponentialRampToValueAtTime(.001,t+d-.04);
+      o.start(t);o.stop(t+d);
+      const o2=audioCtx.createOscillator(),g2=audioCtx.createGain();
+      o2.connect(g2);g2.connect(audioCtx.destination);
+      o2.type='sine';o2.frequency.value=f/2;
+      g2.gain.setValueAtTime(0,t);g2.gain.linearRampToValueAtTime(.04,t+.08);g2.gain.exponentialRampToValueAtTime(.001,t+d-.04);
+      o2.start(t);o2.stop(t+d);
+      t+=d;
+    });
+    const total=melody.reduce((a,b)=>a+b.d,0);
+    setTimeout(()=>{if(musicPlaying)playLoop()},total*1000-200);
+  }catch(e){}
+}
+
+function stopMusic(){musicPlaying=false;if(audioCtx){try{audioCtx.close()}catch(e){}audioCtx=null}}
+
+function toggleMusic(){
+  if(musicPlaying){stopMusic();document.getElementById('musicBtn').textContent='🔇'}
+  else{musicPlaying=true;playLoop();document.getElementById('musicBtn').textContent='🎵'}
+}
+
+// ══════════════════════════════════════════
+// NIGHT MODE
+// ══════════════════════════════════════════
+function toggleNight(){
+  nightMode=!nightMode;
+  document.body.classList.toggle('night-mode',nightMode);
+  document.querySelector('.fb-night').textContent=nightMode?'☀️':'🌙';
+}
+
+// ══════════════════════════════════════════
+// CHAT
+// ══════════════════════════════════════════
+function toggleChat(){
+  document.getElementById('chatPanel').classList.toggle('open');
+  document.getElementById('chatBtn').classList.remove('unread');
+}
+
+async function sendChat(){
+  const input=document.getElementById('chatInput');
+  const msg=input.value.trim();
+  if(!msg||!roomId)return;
+  input.value='';
+  const chatData={sender:myName,message:msg,time:Date.now()};
+  localChats.push(chatData);lastChatLen=localChats.length;
+  renderChat(localChats);
+  try{
+    const room=await dbGet('id',roomId);
+    if(room&&room[0]){
+      let existing=[];
+      try{existing=JSON.parse(room[0].chat_log||'[]')}catch(e){}
+      // Keep last 50 messages only
+      existing.push(chatData);
+      if(existing.length>50)existing=existing.slice(-50);
+      localChats=existing;lastChatLen=existing.length;
+      await dbUpdate('id',roomId,{chat_log:JSON.stringify(existing)});
+    }
+  }catch(e){}
+}
+
+function renderChat(chats){
+  const c=document.getElementById('chatMessages');
+  c.innerHTML='';
+  chats.forEach(ch=>{
+    const div=document.createElement('div');
+    div.className='chat-msg '+(ch.sender===myName?'mine':'theirs');
+    const nameDiv=document.createElement('div');
+    nameDiv.className='chat-msg-name';
+    nameDiv.textContent=ch.sender;
+    const msgNode=document.createTextNode(ch.message);
+    div.appendChild(nameDiv);div.appendChild(msgNode);
+    c.appendChild(div);
+  });
+  c.scrollTop=c.scrollHeight;
+}
+</script>
+</body>
+</html>
