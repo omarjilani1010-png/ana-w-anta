@@ -1216,7 +1216,7 @@ async function poll(){
 
   // ── Heartbeat disconnect check ──
   const partnerHb=isHost?room.guest_heartbeat:room.host_heartbeat;
-  if(partnerHb&&partnerHb>0&&Date.now()-partnerHb>60000&&room.status==='playing'){
+  if(partnerHb&&partnerHb>0&&Date.now()-partnerHb>150000&&room.status==='playing'){
     if(!isShown('disconnectOv')){
       document.getElementById('discSub').textContent=partnerName+' غادر اللعبة';
       showOv('disconnectOv');
