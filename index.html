@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="أنا وانت">
+<meta name="theme-color" content="#080610">
+<meta name="description" content="لعبة أسئلة عربية لشخصين — إهداء خاص من عمر الجيلاني إلى هيلان.">
+<title>أنا وانت</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/css/app.css">
+</head>
+<body>
+
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- HOME -->
+<div class="screen active" id="homeScreen">
+  <div class="home-ornament">
+    <div class="orn-line"></div>
+    <div class="orn-diamond"></div>
+    <div class="orn-line r"></div>
+  </div>
+  <div class="home-title">أنا وانت</div>
+  <div class="home-sub" id="homeSub">184 سؤالًا · للمرتبطين</div>
+  <div class="home-dedication">إهداءٌ خاص لهيلان <span aria-hidden="true">♥</span></div>
+  <div class="cat-filter">
+    <div class="cat-filter-lbl">اختر فئات الأسئلة</div>
+    <div class="cat-chips">
+      <button type="button" class="cat-chip active" data-cat="r" onclick="Cats.toggle('r')">رومانسي ♥</button>
+      <button type="button" class="cat-chip active" data-cat="d" onclick="Cats.toggle('d')">عميق ✦</button>
+      <button type="button" class="cat-chip" data-cat="b" onclick="Cats.toggle('b')">جريء 🔥</button>
+      <button type="button" class="cat-chip active" data-cat="n" onclick="Cats.toggle('n')">ليلي 🌙</button>
+    </div>
+  </div>
+  <div class="home-btns">
+    <button class="btn btn-primary" onclick="App.showCreate()">✦ إنشاء غرفة</button>
+    <button class="btn btn-secondary" onclick="App.showJoin()">الانضمام لغرفة</button>
+    <button class="btn btn-secondary btn-sm" onclick="Intro.show()">📋 التعليمات والإهداء</button>
+    <button class="btn btn-secondary btn-sm" onclick="History.show()">📜 جلسات سابقة</button>
+  </div>
+</div>
+
+<!-- CREATE -->
+<div class="screen" id="createScreen">
+  <button class="back-btn" onclick="App.goHome()">←</button>
+  <div class="input-card">
+    <div class="card-title">غرفتك الخاصة</div>
+    <div class="card-sub">اكتب اسمك وشارك الكود مع شريكك</div>
+    <input class="field" id="createName" placeholder="اسمك..." aria-label="اسم المضيف" autocomplete="nickname" maxlength="20">
+    <button class="btn btn-primary" id="createRoomBtn" onclick="App.createRoom()">إنشاء الغرفة ✦</button>
+    <div id="createResult" style="display:none;margin-top:20px">
+      <div style="font-size:0.65rem;color:rgba(245,239,226,0.28);letter-spacing:3px;margin-bottom:6px">كود الغرفة</div>
+      <div class="code-display" id="roomCode">------</div>
+      <button class="btn btn-secondary btn-sm" onclick="App.copyCode()">نسخ الكود 📋</button>
+      <div class="status-row"><span id="waitText">بانتظار شريكك...</span><span class="dot waiting" id="waitDot"></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- JOIN -->
+<div class="screen" id="joinScreen">
+  <button class="back-btn" onclick="App.goHome()">←</button>
+  <div class="input-card">
+    <div class="card-title">انضم للغرفة</div>
+    <div class="card-sub">اكتب اسمك والكود اللي بعثه لك</div>
+    <input class="field" id="joinName" placeholder="اسمك..." aria-label="اسم اللاعب" autocomplete="nickname" maxlength="20">
+    <input class="field code" id="joinCode" placeholder="123456" aria-label="كود الغرفة المكون من ستة أرقام" maxlength="6" inputmode="numeric" pattern="[0-9٠-٩۰-۹]*" autocomplete="one-time-code" dir="ltr">
+    <button class="btn btn-primary" id="joinRoomBtn" onclick="App.joinRoom()">دخول ✦</button>
+    <div id="joinLoader" style="display:none;text-align:center;margin-top:14px"><div class="loader"></div></div>
+    <div id="joinError" style="display:none;color:#f48fb1;font-size:0.8rem;margin-top:9px;text-align:center"></div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen game-screen" id="gameScreen">
+  <div class="game-header">
+    <div class="header-logo">أنا وانت</div>
+    <div class="header-right">
+      <div class="q-counter">✦ <span id="qCounter">0</span> سؤال</div>
+      <div class="conn-indicator" role="status" aria-live="polite"><span class="dot connected" id="connDot"></span><span id="connTxt">متصلان</span></div>
+    </div>
+  </div>
+  <div class="game-body">
+    <!-- Timer -->
+    <div class="timer-wrap">
+      <div class="timer-ring">
+        <svg class="timer-svg" viewBox="0 0 52 52">
+          <circle class="timer-track" cx="26" cy="26" r="21"/>
+          <circle class="timer-arc" id="timerArc" cx="26" cy="26" r="21"/>
+        </svg>
+        <div class="timer-num" id="timerNum">60</div>
+      </div>
+      <span class="paused-badge" id="pausedBadge">موقوف ⏸</span>
+    </div>
+    <!-- Badge -->
+    <div class="cat-badge cat-r" id="catBadge">رومانسي ♥</div>
+    <!-- Question -->
+    <div class="q-card" id="qCard">
+      <div class="q-divider"></div>
+      <div class="q-num" id="qNum">السؤال 1</div>
+      <div class="q-text" id="qText">...</div>
+      <div class="q-dots"><i></i><i></i><i></i></div>
+    </div>
+    <!-- Progress -->
+    <div class="prog-wrap">
+      <div class="prog-bg"><div class="prog-fill" id="progFill" style="width:0.5%"></div></div>
+      <div class="prog-txt" id="progTxt">1 / —</div>
+    </div>
+    <!-- Answers -->
+    <div class="ans-row">
+      <div class="ans-box" id="myAnsBox">
+        <div class="ans-lbl" id="myLbl">أنت</div>
+        <div class="ans-txt" id="myAnsDsp"><span class="ans-wait">لم تجب بعد</span></div>
+      </div>
+      <div class="ans-box" id="partnerAnsBox">
+        <div class="ans-lbl" id="partnerLbl">الشريك</div>
+        <div class="ans-txt" id="partnerAnsDsp"><span class="ans-wait">بانتظار الشريك...</span></div>
+      </div>
+    </div>
+    <!-- Input -->
+    <div class="ans-inp-wrap">
+      <textarea class="ans-inp" id="ansInp" placeholder="إجابتك..." rows="1" maxlength="500"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="Game.sendAnswer()">↑</button>
+    </div>
+    <!-- Nav -->
+    <div class="game-nav">
+      <button class="nav-btn" onclick="Game.prevQ()">◀ السابق</button>
+      <button class="nav-btn rnd" onclick="Game.randomQ()">عشوائي ✦</button>
+      <button class="nav-btn" onclick="Game.nextQ()">التالي ▶</button>
+    </div>
+    <!-- Actions -->
+    <div class="act-row">
+      <button class="btn btn-secondary" id="pauseBtn" onclick="Game.togglePause()">⏸ إيقاف</button>
+      <button class="btn btn-danger" onclick="Game.requestEnd()">🏁 إنهاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div class="screen results-screen" id="resultsScreen">
+  <div class="results-title">النتائج ✦</div>
+  <div class="results-sub">جلستكم مع بعض</div>
+  <div class="scores-grid">
+    <div class="score-card"><div class="score-name" id="resN1">أنت</div><div class="score-num" id="resS1">0</div><div class="score-lbl">سؤال أجبت</div></div>
+    <div class="score-card"><div class="score-name" id="resN2">الشريك</div><div class="score-num" id="resS2">0</div><div class="score-lbl">سؤال أجبت</div></div>
+  </div>
+  <div class="history-wrap" id="historyWrap"></div>
+  <button class="btn btn-primary" style="max-width:355px;width:100%" onclick="App.goHome()">العودة للبداية ✦</button>
+</div>
+
+<!-- FLOAT BUTTONS -->
+<div class="float-wrap" id="floatWrap">
+  <button class="fb" id="musicFb" onclick="Audio.toggle()" title="موسيقى">🎵</button>
+  <button class="fb" id="nightFb" onclick="UI.toggleNight()" title="وضع ليلي">🌙</button>
+  <button class="fb" id="chatFb" onclick="UI.toggleChat()" title="دردشة">💬</button>
+</div>
+
+<!-- MAIN CHAT -->
+<div class="chat-panel" id="chatPanel">
+  <div class="ch-header">
+    <div class="ch-title">✦ دردشة</div>
+    <button class="ch-close" onclick="UI.toggleChat()">✕</button>
+  </div>
+  <div class="ch-msgs" id="chatMsgs"></div>
+  <div class="ch-inp-row">
+    <button class="ch-send" onclick="Chat.sendMain()">↑</button>
+    <input class="ch-inp" id="chatInp" placeholder="اكتب رسالة..." maxlength="300" onkeypress="if(event.key==='Enter')Chat.sendMain()">
+  </div>
+</div>
+
+<!-- MODAL: REVEAL -->
+<div class="modal-backdrop" id="revealModal">
+  <div class="modal-title" style="color:var(--c-gold);font-family:var(--f-serif);font-size:1.5rem">✦ إجاباتكم ✦</div>
+  <div class="reveal-grid">
+    <div class="rev-card"><div class="rev-name" id="revMyName">أنت</div><div class="rev-ans" id="revMyAns">—</div></div>
+    <div class="rev-card"><div class="rev-name" id="revPartName">الشريك</div><div class="rev-ans" id="revPartAns">—</div></div>
+  </div>
+  <div style="display:flex;gap:9px;width:100%;max-width:355px">
+    <button class="btn btn-secondary btn-sm" style="flex:1" onclick="UI.captureCard()">📸 احفظ</button>
+    <button class="btn btn-primary btn-sm" style="flex:2" onclick="Game.closeReveal()">تناقشوا ✦</button>
+  </div>
+</div>
+
+<!-- POST CHAT -->
+<div class="post-chat-wrap" id="postChatWrap">
+  <div class="pch-header">
+    <div class="pch-title">تناقشوا الآن 💬</div>
+    <button class="pch-skip" onclick="Game.donePostChat()">تخطي ←</button>
+  </div>
+  <div class="pch-msgs" id="postChatMsgs"></div>
+  <div class="pch-inp-row">
+    <button class="pch-send" onclick="Chat.sendPost()">↑</button>
+    <input class="pch-inp" id="postChatInp" placeholder="اكتب رسالة..." maxlength="300" onkeypress="if(event.key==='Enter')Chat.sendPost()">
+  </div>
+  <button class="btn btn-primary btn-sm pch-done" onclick="Game.donePostChat()">✓ خلصنا — السؤال الجاي</button>
+</div>
+
+<!-- MODAL: PUNISHMENT SELECT -->
+<div class="modal-backdrop" id="punSelectModal">
+  <div class="modal-card">
+    <div class="modal-title">اختر العقاب 😈</div>
+    <div class="modal-sub">الطرف الثاني ما جاوب!</div>
+    <div class="pun-types">
+      <button class="pun-type-btn pun-r" onclick="Game.pickPun('romantic')">💋 رومانسي</button>
+      <button class="pun-type-btn pun-f" onclick="Game.pickPun('fun')">😄 حركي</button>
+      <button class="pun-type-btn pun-h" onclick="Game.pickPun('hard')">😈 قاسي</button>
+      <button class="pun-type-btn pun-c" onclick="UI.showCustomPun()">✏️ اكتب من عندك</button>
+      <input class="custom-inp" id="customPunInp" placeholder="اكتب العقاب هنا...">
+      <button class="btn btn-primary btn-sm" id="customSendBtn" style="display:none;margin-top:4px" onclick="Game.sendCustomPun()">إرسال</button>
+    </div>
+  </div>
+</div>
+
+<!-- PUNISHMENT SCREEN - unified for both players with chat -->
+<div class="pun-screen" id="punScreen">
+  <div class="pun-screen-header">
+    <div class="pun-screen-title" id="punScreenTitle">⚔️ وقت العقاب</div>
+    <div class="pun-screen-sub" id="punScreenSub">—</div>
+  </div>
+  <div class="pun-screen-body">
+    <div class="pun-screen-card" id="punScreenCard">
+      <span class="pun-big-emoji" id="punBigEmoji">😈</span>
+      <div class="pun-big-text" id="punBigText">—</div>
+      <div class="pun-big-type" id="punBigType">—</div>
+    </div>
+    <div class="pun-chat-msgs" id="punChatMsgs"></div>
+  </div>
+  <div class="pun-chat-inp-row">
+    <button class="pch-send" onclick="Chat.sendPunChat()">↑</button>
+    <input class="pch-inp" id="punChatInp" placeholder="اكتب هنا..." maxlength="300" onkeypress="if(event.key==='Enter')Chat.sendPunChat()">
+  </div>
+  <div class="pun-screen-footer" id="punScreenFooter">
+    <!-- shown only to non-answerer -->
+  </div>
+</div>
+
+<!-- MODAL: END REQUEST -->
+<div class="modal-backdrop" id="endReqModal">
+  <div class="modal-card">
+    <div class="modal-title">إنهاء اللعبة؟</div>
+    <div class="modal-sub" id="endReqSub">الطرف الآخر يطلب إنهاء اللعبة</div>
+    <div class="modal-btns">
+      <button class="btn btn-primary btn-sm" onclick="Game.acceptEnd()">موافق ✓</button>
+      <button class="btn btn-secondary btn-sm" onclick="Game.rejectEnd()">لا، نكمل</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PARTNER CONNECTION -->
+<div class="modal-backdrop" id="discModal" role="dialog" aria-modal="true" aria-labelledby="discTitle">
+  <div class="modal-card disc-card">
+    <div class="modal-title" id="discTitle" style="color:#ffb2a8">تأخر اتصال الشريك</div>
+    <div class="modal-sub" id="discSub">ما وصلنا تحديث من الطرف الآخر؛ سنواصل محاولة الاتصال.</div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary btn-sm" onclick="Modal.hide('discModal')">انتظار عودته</button>
+      <button class="btn btn-primary btn-sm" onclick="App.goHome()">مغادرة الغرفة</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: HISTORY -->
+<div class="modal-backdrop" id="historyModal">
+  <div class="modal-card history-modal-card">
+    <div class="modal-title">📜 جلسات سابقة</div>
+    <div class="modal-sub" style="margin-bottom:12px">محفوظة على هذا الجهاز فقط</div>
+    <div id="historyList"></div>
+    <button class="btn btn-secondary" style="width:100%;margin-top:14px" onclick="Modal.hide('historyModal')">إغلاق</button>
+  </div>
+</div>
+
+<!-- MODAL: INTRO -->
+<div class="modal-backdrop" id="introModal">
+  <div class="modal-card intro-card">
+    <div class="intro-scroll">
+    <div class="intro-dedication">
+      ✦ أنا وانت ✦
+      <div class="intro-poem">
+        في كل سؤالٍ همسةٌ لم أقلها،<br>
+        وفي كل إجابةٍ لحظةٌ اقتربنا فيها أكثر.<br>
+        صنعتُ هذه اللعبة لنلتقي فيها<br>
+        بعيداً عن الضوضاء، قريبين من القلب.<br>
+        <em>لأن أجمل قصص الحب تُكتب بالصدق — لا بالعجلة ♥</em>
+      </div>
+      <div class="intro-sign">
+        <div class="intro-sign-main">
+          إهداءً من<br><strong>عمر الجيلاني</strong><br>
+          إلى حبيبته<br><strong>هيلان</strong>
+        </div>
+        <div class="intro-sign-sub">
+          هيلان...<br>
+          يمكن الألعاب تنتهي، والأسئلة تخلص، والوقت يمر بسرعة غبية كعادته,
+          بس إنتِ الشي الوحيد اللي كل مرة بخليني أرجع أبتسم بدون سبب.<br>
+          وجودك معي أهدى من كل الضوضاء، وأجمل من ألف كلام ينحكى.<br>
+          أحبك بطريقة تخوفني أحيانًا... لأنك صرتِ جزء من روحي فعلًا ♥
+        </div>
+      </div>
+    </div>
+    <div class="intro-section-title">📋 كيف تلعبون</div>
+    <div class="intro-rules">
+      <ul>
+        <li>أحدكم ينشئ غرفة ويشارك الكود (٦ أرقام) مع شريكه، والثاني ينضم بالكود.</li>
+        <li>يظهر سؤال لكليكم — لديكم <strong>٦٠ ثانية</strong> للإجابة.</li>
+        <li>عند إجابة الطرفين تُكشف الإجابات، ثم تفتح دردشة قصيرة قبل السؤال التالي.</li>
+        <li>إذا انتهى الوقت ولم يُجب أحدكم، يختار المُجيب عقاباً على الآخر.</li>
+        <li>بعد <strong>١٠ أسئلة</strong> تُفتح فئة الأسئلة الجريئة 🔥.</li>
+        <li>يمكنكم الإيقاف المؤقت، الدردشة الجانبية، والتنقل بين الأسئلة.</li>
+        <li>إنهاء اللعبة يحتاج موافقة الطرفين.</li>
+      </ul>
+    </div>
+    <div class="intro-section-title">💡 ملاحظات</div>
+    <div class="intro-rules">
+      <ul>
+        <li>اللعبة للمرتبطين — كن لطيفاً واحترم شريكك.</li>
+        <li>العقوبات للمرح فقط — نفّذوها بالاتفاق.</li>
+        <li>تأكدوا من اتصال الإنترنت طوال الجلسة.</li>
+      </ul>
+    </div>
+    </div>
+    <p class="intro-note">بالضغط على «ابدأ» أنت توافق على اللعب بروح ودّية ومرح ♥</p>
+    <button class="btn btn-primary" style="margin-top:8px;width:100%" onclick="Intro.dismiss()">ابدأ اللعبة ✦</button>
+  </div>
+</div>
+
+<!-- MODAL: SCREENSHOT -->
+<div class="modal-backdrop" id="scModal">
+  <div class="sc-card">
+    <div class="sc-title">أنا وانت ✦</div>
+    <div class="sc-q" id="scQ"></div>
+    <div class="sc-grid">
+      <div class="sc-box"><div class="sc-box-name" id="scN1"></div><div class="sc-box-text" id="scA1"></div></div>
+      <div class="sc-box"><div class="sc-box-name" id="scN2"></div><div class="sc-box-text" id="scA2"></div></div>
+    </div>
+  </div>
+  <button class="btn btn-secondary btn-sm" onclick="UI.downloadCard()">💾 حفظ كصورة</button>
+  <button class="btn btn-secondary btn-sm" onclick="Modal.hide('scModal')">إغلاق</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="./assets/js/questions.js"></script>
+<script src="./assets/js/app.js"></script>
+</body>
+</html>

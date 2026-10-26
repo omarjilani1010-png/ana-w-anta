@@ -4,7 +4,7 @@
   "description": "لعبة أسئلة للمرتبطين — إهداء من عمر الجيلاني إلى هيلان",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "./معدل4.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#080610",
   "theme_color": "#080610",
