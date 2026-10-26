@@ -37,9 +37,13 @@ const Room = {
   async finish() {
     if (!GS.roomId || !GS.roomToken) return;
     const id = GS.roomId;
-    DB.setToken(GS.roomToken);
-    await DB.upd(id, { status: 'finished' }, { silent: true });
-    await DB.del(id, { silent: true });
+    const token = GS.roomToken;
+    const isHost = GS.isHost;
+    const updated = await DB.upd(id, { status: 'finished' }, { silent: true, roomToken: token });
+    // Keep the finished room readable long enough for the other player's poller to show results.
+    if (isHost && Array.isArray(updated) && updated.length > 0) {
+      setTimeout(() => DB.del(id, { silent: true, roomToken: token }), 15000);
+    }
   }
 };
 
@@ -160,6 +164,16 @@ const DB = (() => {
     },
     ins:  (data, opts)          => req('POST', 'select=id', data, opts),
     upd:  (id, data, opts)      => req('PATCH', `id=eq.${encodeURIComponent(id)}&select=id`, data, opts),
+    cas: (id, conditions, data, opts) => {
+      const filters = [`id=eq.${encodeURIComponent(id)}`];
+      for (const [column, value] of Object.entries(conditions || {})) {
+        if (!/^[a-z_]+$/.test(column)) throw new Error('Invalid compare-and-set column');
+        filters.push(value === null
+          ? `${column}=is.null`
+          : `${column}=eq.${encodeURIComponent(String(value))}`);
+      }
+      return req('PATCH', `${filters.join('&')}&select=id`, data, opts);
+    },
     del:  (id, opts)            => req('DELETE', `id=eq.${encodeURIComponent(id)}`, null, opts),
     rpc,
     patchKeepalive
@@ -808,12 +822,11 @@ const Timer = (() => {
    CHAT RENDERER
 ═══════════════════════════════════════ */
 const Chat = (() => {
-  // ── Per-channel queues; prefer an atomic server append and retain legacy fallback. ──
+  // ── Per-channel queues; all persistent appends use the atomic server RPC. ──
   const inflight = { main: false, post: false, pun: false };
   const queues   = { main: [],    post: [],    pun: [] };
   const retryTimers = { main: null, post: null, pun: null };
   const generation = { main: 0, post: 0, pun: 0 };
-  let appendRpcAvailable = null;
 
   function renderTo(containerId, msgs) {
     const c = document.getElementById(containerId);
@@ -844,10 +857,10 @@ const Chat = (() => {
     }, 3000);
   }
 
-  // Server-side row locking prevents two players from replacing each other's chat.
-  // Until the migration is applied, use the compatible read/merge/write path.
+  // Atomic RPC is the only persistence path. Unknown failures are retried; they never
+  // downgrade to a read/merge/write sequence that can overwrite the other player's chat.
   async function flushChannel(key, dbField, getLocal, setLocal, renderId) {
-    if (inflight[key]) return;               // already in-flight; messages were queued
+    if (inflight[key]) return;
     inflight[key] = true;
     const runGeneration = generation[key];
     const roomId = GS.roomId;
@@ -858,7 +871,7 @@ const Chat = (() => {
     try {
       while (queues[key].length > 0) {
         if (!isCurrentSession()) break;
-        const batch = queues[key].splice(0); // take all pending at once
+        const batch = queues[key].splice(0);
         if (!roomId || !roomToken) {
           if (isCurrentSession()) {
             queues[key].unshift(...batch);
@@ -867,69 +880,33 @@ const Chat = (() => {
           break;
         }
 
-        let useLegacyWrite = appendRpcAvailable === false;
-        let atomicRejected = false;
         let latestMessages = [];
-        if (!useLegacyWrite) {
-          for (const message of batch) {
-            const result = await DB.rpc('append_room_message', {
-              p_room_id: String(roomId),
-              p_room_token: roomToken,
-              p_channel: dbField,
-              p_message: message
-            }, { silent: true, roomToken });
-            if (!isCurrentSession()) { atomicRejected = true; break; }
-            if (result === null) {
-              // Older production databases may not have the migration yet.
-              appendRpcAvailable = false;
-              useLegacyWrite = true;
-              break;
-            }
-            appendRpcAvailable = true;
-            if (result.ok !== true || !Array.isArray(result.messages)) {
-              queues[key].unshift(...batch);
-              shouldRetry = true;
-              atomicRejected = true;
-              console.warn('[CHAT] atomic append rejected; message retained for retry');
-              break;
-            }
-            latestMessages = result.messages;
+        let rejected = false;
+        for (const message of batch) {
+          const result = await DB.rpc('append_room_message', {
+            p_room_id: String(roomId),
+            p_room_token: roomToken,
+            p_channel: dbField,
+            p_message: message
+          }, { silent: true, roomToken });
+          if (!isCurrentSession()) { rejected = true; break; }
+          if (!result || result.ok !== true || !Array.isArray(result.messages)) {
+            queues[key].unshift(...batch);
+            shouldRetry = true;
+            rejected = true;
+            console.warn('[CHAT] atomic append unavailable or rejected; messages retained for retry');
+            break;
           }
-          if (atomicRejected && !isCurrentSession()) break;
-          if (atomicRejected) break;
-          if (!useLegacyWrite) {
-            if (!isCurrentSession()) break;
-            const merged = mergeByTime(latestMessages, queues[key]);
-            setLocal(merged);
-            renderTo(renderId, merged);
-            continue;
-          }
+          latestMessages = result.messages;
         }
-
-        const rows = await DB.get('id', roomId, { silent: true, roomToken });
+        if (rejected && !isCurrentSession()) break;
+        if (rejected) break;
         if (!isCurrentSession()) break;
-        if (!rows || !rows[0]) {
-          queues[key].unshift(...batch);
-          shouldRetry = true;
-          console.warn('[CHAT] flush(' + key + '): room unavailable; message retained');
-          break;
-        }
-        let dbArr = [];
-        try { dbArr = JSON.parse(rows[0][dbField] || '[]'); } catch(e) {}
-        const merged = mergeByTime(dbArr, batch);
-        const wrote = await DB.upd(roomId, { [dbField]: JSON.stringify(merged) }, { silent: true, roomToken });
-        if (!isCurrentSession()) break;
-        if (wrote && wrote[0]) {
-          setLocal(merged);
-          renderTo(renderId, merged);
-        } else {
-          queues[key].unshift(...batch);
-          shouldRetry = true;
-          console.warn('[CHAT] flush(' + key + '): write failed; message retained');
-          break;
-        }
+        const merged = mergeByTime(latestMessages, queues[key]);
+        setLocal(merged);
+        renderTo(renderId, merged);
       }
-    } catch(e) {
+    } catch (e) {
       console.warn('[CHAT] flush(' + key + ') error:', e);
       shouldRetry = isCurrentSession();
     }
@@ -941,14 +918,21 @@ const Chat = (() => {
     }
   }
 
+  function clearChannel(key) {
+    if (!Object.prototype.hasOwnProperty.call(queues, key)) return;
+    generation[key] += 1;
+    queues[key].length = 0;
+    if (retryTimers[key]) clearTimeout(retryTimers[key]);
+    retryTimers[key] = null;
+  }
+
   function clearPending() {
-    for (const key of Object.keys(queues)) {
-      generation[key] += 1;
-      queues[key].length = 0;
-      if (retryTimers[key]) clearTimeout(retryTimers[key]);
-      retryTimers[key] = null;
-    }
-    appendRpcAvailable = null;
+    Object.keys(queues).forEach(clearChannel);
+  }
+
+  function hasPending(key) {
+    return Object.prototype.hasOwnProperty.call(queues, key) &&
+      (queues[key].length > 0 || inflight[key] || Boolean(retryTimers[key]));
   }
 
   function enqueue(key, dbField, msgData, getLocal, setLocal, renderId) {
@@ -963,6 +947,8 @@ const Chat = (() => {
     renderTo,
     mergeByTime,
     clearPending,
+    clearChannel,
+    hasPending,
     sendMain() {
       const inp = document.getElementById('chatInp');
       const msg = inp.value.trim();
@@ -983,6 +969,7 @@ const Chat = (() => {
       const inp = document.getElementById('postChatInp');
       const msg = inp.value.trim();
       if (!msg || !GS.roomId) return;
+      if (Game.isChangingQuestion) { Toast.show('جارٍ تثبيت السؤال الجديد؛ انتظر لحظة قبل الإرسال.', 'warning'); return; }
       if (msg.length > 300) { Toast.show('الرسالة طويلة جداً (300 حرف كحد أقصى)', 'error'); return; }
       inp.value = '';
       Audio.click();
@@ -998,6 +985,7 @@ const Chat = (() => {
       const inp = document.getElementById('punChatInp');
       const msg = inp.value.trim();
       if (!msg || !GS.roomId) return;
+      if (Game.isChangingQuestion) { Toast.show('جارٍ تثبيت السؤال الجديد؛ انتظر لحظة قبل الإرسال.', 'warning'); return; }
       if (msg.length > 300) { Toast.show('الرسالة طويلة جداً (300 حرف كحد أقصى)', 'error'); return; }
       inp.value = '';
       Audio.click();
@@ -1313,7 +1301,41 @@ const App = {
    GAME LOGIC
 ═══════════════════════════════════════ */
 const Game = {
+  isChangingQuestion: false,
+  answerPending: false,
+  pausePending: false,
+  postChatPending: false,
+  punishmentPending: false,
+  endActionPending: false,
+  resultsShowing: false,
+
+  isStateMutationPending() {
+    return this.isChangingQuestion || this.answerPending || this.pausePending ||
+      this.postChatPending || this.punishmentPending || this.endActionPending || this.resultsShowing;
+  },
+
+  endRequestMarker() {
+    return GS.isHost ? 'role:host' : 'role:guest';
+  },
+
+  isPartnerEndRequest(value) {
+    if (!value || value === 'accepted') return false;
+    const partnerRole = GS.isHost ? 'role:guest' : 'role:host';
+    return value === partnerRole || (value === GS.partnerName && value !== GS.myName);
+  },
+
+  resetActionLocks() {
+    this.isChangingQuestion = false;
+    this.answerPending = false;
+    this.pausePending = false;
+    this.postChatPending = false;
+    this.punishmentPending = false;
+    this.endActionPending = false;
+    this.resultsShowing = false;
+  },
+
   start(roomData) {
+    this.resetActionLocks();
     GS.reset();
     if (roomData) {
       const index = Number(roomData.current_q);
@@ -1327,6 +1349,7 @@ const Game = {
   },
 
   resume(roomData) {
+    this.resetActionLocks();
     if (roomData) {
       const index = Number(roomData.current_q);
       GS.currentQ = Number.isInteger(index) && Qs[index] ? index : 0;
@@ -1401,55 +1424,84 @@ const Game = {
   },
 
   async changeQ(newQ) {
-    if (!Number.isInteger(newQ) || !Qs[newQ]) return;
-    GS.currentQ = newQ;
-    if (!GS.usedQs.includes(newQ)) GS.usedQs.push(newQ);
-    // Track bold questions used
-    if (Qs[newQ].c === 'b') {
-      GS.boldQsThisRound++;
-      if (GS.boldQsThisRound >= 2) {
-        // Will auto-exclude bold in next random picks
-        setTimeout(() => { GS.boldQsThisRound = 0; Session.save(Session.load()?.code || ''); }, 60000); // reset after 1 min
-      }
+    if (!Number.isInteger(newQ) || !Qs[newQ] || newQ === GS.currentQ || this.isChangingQuestion) return false;
+    if (Chat.hasPending('post') || Chat.hasPending('pun')) {
+      Toast.show('جارٍ حفظ رسائل هذه المرحلة؛ انتظر اكتمال الإرسال ثم تابع.', 'warning', 5000);
+      return false;
     }
-    // Restore music volume
-    Audio.setVolume(document.body.classList.contains('night') ? 0.2 : 0.35);
-    Audio.unmuteGenerated();
-    GS.answered = false;
-    GS.revealShown = false;
-    GS.punPending = false;
-    GS.punSent = false;
-    GS.lastPun = '';
-    GS.lastPostOpen = 0;
-    GS.partnerAnsweredThisQ = false;
-    const now = Date.now();
-    GS.timerStartedAt = now;
-    GS.timerPaused = false;
-    GS.timerElapsedAtPause = 0;
-    UI.loadQ(true);
-    Timer.reset(now);
-    Audio.click();
-    Modal.hide('punSelectModal');
-
+    const expectedQ = GS.currentQ;
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    if (!roomId || !roomToken) return false;
+    this.isChangingQuestion = true;
+    Poller.invalidateState();
+    Chat.clearChannel('post');
+    Chat.clearChannel('pun');
+    GS.postChats = []; GS.lastPostLen = 0;
+    GS.punChatMsgs = []; GS.lastPunChatLen = 0;
+    document.getElementById('postChatMsgs').innerHTML = '';
+    document.getElementById('punChatMsgs').innerHTML = '';
     document.getElementById('postChatWrap').classList.remove('show');
-    await DB.upd(GS.roomId, {
-      current_q: newQ,
-      host_answer: null, guest_answer: null,
-      punishment: null, post_chat_open: 0,
-      post_chat_log: '[]', pun_chat_log: '[]',
-      pause_state: 0,
-      timer_started_at: now, timer_elapsed_pause: 0
-    });
-    Session.save(Session.load()?.code || '');
-  },
+    document.getElementById('punScreen').classList.remove('show');
+    try {
+      GS.currentQ = newQ;
+      if (!GS.usedQs.includes(newQ)) GS.usedQs.push(newQ);
+      if (Qs[newQ].c === 'b') {
+        GS.boldQsThisRound++;
+        if (GS.boldQsThisRound >= 2) {
+          setTimeout(() => { GS.boldQsThisRound = 0; Session.save(Session.load()?.code || ''); }, 60000);
+        }
+      }
+      Audio.setVolume(document.body.classList.contains('night') ? 0.2 : 0.35);
+      Audio.unmuteGenerated();
+      GS.answered = false;
+      GS.revealShown = false;
+      GS.punPending = false;
+      GS.punSent = false;
+      GS.lastPun = '';
+      GS.lastPostOpen = 0;
+      GS.partnerAnsweredThisQ = false;
+      const now = Date.now();
+      GS.timerStartedAt = now;
+      GS.timerPaused = false;
+      GS.timerElapsedAtPause = 0;
+      UI.loadQ(true);
+      Timer.reset(now);
+      Audio.click();
+      Modal.hide('punSelectModal');
 
+      const saved = await DB.cas(roomId, { current_q: expectedQ, status: 'playing' }, {
+        current_q: newQ,
+        host_answer: null, guest_answer: null,
+        punishment: null, post_chat_open: 0,
+        post_chat_log: '[]', pun_chat_log: '[]',
+        pause_state: 0,
+        timer_started_at: now, timer_elapsed_pause: 0
+      }, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!saved || !saved[0]) {
+        if (sameSession) {
+          Toast.show('تغيّر السؤال من الطرف الآخر أو تعذّر حفظ الانتقال؛ جارٍ مزامنة اللعبة.', 'warning', 5000);
+          await Poller.refresh();
+        }
+        return false;
+      }
+      if (sameSession) {
+        Session.save(Session.load()?.code || '');
+      }
+      return true;
+    } finally {
+      this.isChangingQuestion = false;
+      Poller.refresh();
+    }
+  },
   moveQ(direction) {
     const next = nextAllowedQ(GS.currentQ, direction);
     if (next === GS.currentQ) {
       Toast.show('لا توجد أسئلة أخرى مفعّلة ضمن الفئات المختارة', 'warning');
       return;
     }
-    this.changeQ(next);
+    return this.changeQ(next);
   },
   nextQ()   { this.moveQ(1); },
   prevQ()   { this.moveQ(-1); },
@@ -1477,96 +1529,159 @@ const Game = {
     const input = document.getElementById('ansInp');
     const button = document.getElementById('sendBtn');
     let ans = input.value.trim();
-    if (!ans || GS.answered) return;
+    if (!ans || GS.answered || this.answerPending) return false;
     if (ans.length > MAX_ANSWER_LEN) {
       ans = ans.slice(0, MAX_ANSWER_LEN);
       input.value = ans;
       Toast.show('تم اختصار الإجابة إلى ' + MAX_ANSWER_LEN + ' حرف', 'warning');
     }
-    GS.answered = true;
-    document.getElementById('myAnsDsp').textContent = ans;
-    document.getElementById('myAnsBox').classList.add('answered');
-    input.disabled = true;
-    button.disabled = true;
-    GS.myAnsweredCount++;
-    Audio.click();
-    const field = GS.isHost ? { host_answer: ans } : { guest_answer: ans };
-    const saved = await DB.upd(GS.roomId, field);
-    if (!Array.isArray(saved) || saved.length === 0) {
-      GS.answered = false;
-      GS.myAnsweredCount = Math.max(0, GS.myAnsweredCount - 1);
-      document.getElementById('myAnsDsp').innerHTML = '<span class="ans-wait">لم تجب بعد</span>';
-      document.getElementById('myAnsBox').classList.remove('answered');
-      const canRetry = Timer.getRemaining() > 0 && !GS.timerPaused;
-      input.disabled = !canRetry;
-      button.disabled = !canRetry;
-      Toast.show(canRetry
-        ? 'تعذّر حفظ إجابتك؛ لم تُرسل. تحقّق من الاتصال وحاول مجددًا.'
-        : 'انقطع الاتصال ولم تُحفظ الإجابة بعد انتهاء الوقت. انتظر عودة الاتصال أو ابدأ سؤالًا جديدًا.',
-        'warning', 6000);
-      return false;
-    }
-    input.value = '';
-    return true;
-  },
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    const expectedQ = GS.currentQ;
+    if (!roomId || !roomToken) return false;
+    this.answerPending = true;
+    Poller.invalidateState();
+    try {
+      GS.answered = true;
+      document.getElementById('myAnsDsp').textContent = ans;
+      document.getElementById('myAnsBox').classList.add('answered');
+      input.disabled = true;
+      button.disabled = true;
+      GS.myAnsweredCount++;
+      Audio.click();
 
-  togglePause() {
+      const result = await DB.rpc('submit_room_answer', {
+        p_room_id: String(roomId),
+        p_room_token: roomToken,
+        p_question: expectedQ,
+        p_answer: ans
+      }, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!sameSession) return false;
+      if (!result || result.ok !== true || Number(result.current_q) !== expectedQ) {
+        const definitelyRejected = result && result.ok === false &&
+          (result.reason === 'stale' || result.reason === 'paused');
+        if (GS.currentQ === expectedQ || definitelyRejected) {
+          GS.myAnsweredCount = Math.max(0, GS.myAnsweredCount - 1);
+        }
+        if (GS.currentQ === expectedQ) {
+          GS.answered = false;
+          document.getElementById('myAnsDsp').innerHTML = '<span class="ans-wait">لم تجب بعد</span>';
+          document.getElementById('myAnsBox').classList.remove('answered');
+          input.disabled = false;
+          button.disabled = false;
+        }
+        await Poller.refresh();
+        if (GS.currentQ === expectedQ && GS.answered) {
+          input.value = '';
+          return true;
+        }
+        if (GS.currentQ === expectedQ) {
+          const canRetry = Timer.getRemaining() > 0 && !GS.timerPaused;
+          input.disabled = !canRetry;
+          button.disabled = !canRetry;
+        }
+        Toast.show('لم تُحفظ الإجابة أو تغيّر السؤال؛ تحقّق من الاتصال وحاول عند ظهور السؤال الحالي.', 'warning', 6000);
+        return false;
+      }
+      if (GS.currentQ === expectedQ) input.value = '';
+      return true;
+    } finally {
+      this.answerPending = false;
+      Poller.refresh();
+    }
+  },
+  async togglePause() {
+    if (this.pausePending) return false;
     const btn = document.getElementById('pauseBtn');
     const badge = document.getElementById('pausedBadge');
-    if (!GS.timerPaused) {
-      const elapsed = (Date.now() - GS.timerStartedAt) / 1000;
-      GS.timerElapsedAtPause = elapsed;
-      Timer.pause();
-      btn.textContent = '▶ استئناف';
-      badge.style.display = 'inline';
-      document.getElementById('ansInp').disabled = true;
-      document.getElementById('sendBtn').disabled = true;
-      DB.upd(GS.roomId, { pause_state: 1, timer_elapsed_pause: elapsed });
-    } else {
-      const elapsed = GS.timerElapsedAtPause;
-      const newStart = Date.now() - elapsed * 1000;
-      GS.timerStartedAt = newStart;
-      Timer.resume(newStart, elapsed);
-      btn.textContent = '⏸ إيقاف';
-      badge.style.display = 'none';
-      if (Timer.getRemaining() > 0 && !GS.answered) {
-        document.getElementById('ansInp').disabled = false;
-        document.getElementById('sendBtn').disabled = false;
-      }
-      DB.upd(GS.roomId, { pause_state: 0, timer_started_at: newStart, timer_elapsed_pause: elapsed });
-    }
-  },
-
-  async closeReveal() {
-    Modal.hide('revealModal');
-    Audio.click();
-    GS.lastPostOpen = 1;
-    document.getElementById('postChatWrap').classList.add('show');
-    // PATCH C6: only reset post_chat_log if it's genuinely a new session.
-    // Read current DB state first; if already non-empty, preserve it.
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    const expectedQ = GS.currentQ;
+    const wasPaused = GS.timerPaused;
+    const expectedPause = wasPaused ? 1 : 0;
+    if (!roomId || !roomToken) return false;
+    this.pausePending = true;
+    Poller.invalidateState();
+    if (btn) btn.disabled = true;
     try {
-      const rows = await DB.get('id', GS.roomId);
-      const existing = rows && rows[0] ? (() => { try { return JSON.parse(rows[0].post_chat_log || '[]'); } catch(e) { return []; } })() : [];
-      if (existing.length === 0) {
-        GS.postChats = []; GS.lastPostLen = 0;
-        document.getElementById('postChatMsgs').innerHTML = '';
-        await DB.upd(GS.roomId, { post_chat_open: 1, post_chat_log: '[]' });
+      let patch;
+      let elapsed = 0;
+      let newStart = 0;
+      if (!wasPaused) {
+        elapsed = (Date.now() - GS.timerStartedAt) / 1000;
+        patch = { pause_state: 1, timer_elapsed_pause: elapsed };
       } else {
-        // Post chat already has messages (race: partner sent before host closed reveal)
-        GS.postChats = existing; GS.lastPostLen = existing.length;
-        Chat.renderTo('postChatMsgs', existing);
-        await DB.upd(GS.roomId, { post_chat_open: 1 });
+        elapsed = GS.timerElapsedAtPause;
+        newStart = Date.now() - elapsed * 1000;
+        patch = { pause_state: 0, timer_started_at: newStart, timer_elapsed_pause: elapsed };
       }
-    } catch(e) {
-      GS.postChats = []; GS.lastPostLen = 0;
-      document.getElementById('postChatMsgs').innerHTML = '';
-      DB.upd(GS.roomId, { post_chat_open: 1, post_chat_log: '[]' });
+      const saved = await DB.cas(roomId, {
+        current_q: expectedQ, status: 'playing', pause_state: expectedPause
+      }, patch, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!saved || !saved[0]) {
+        if (sameSession) {
+          await Poller.refresh();
+          Toast.show('تغيّرت حالة المؤقت من الطرف الآخر؛ تمت مزامنة اللعبة.', 'warning');
+        }
+        return false;
+      }
+      if (!sameSession) return false;
+      if (!wasPaused) {
+        GS.timerElapsedAtPause = elapsed;
+        Timer.pause();
+        if (btn) btn.textContent = '▶ استئناف';
+        if (badge) badge.style.display = 'inline';
+        document.getElementById('ansInp').disabled = true;
+        document.getElementById('sendBtn').disabled = true;
+      } else {
+        GS.timerStartedAt = newStart;
+        Timer.resume(newStart, elapsed);
+        if (btn) btn.textContent = '⏸ إيقاف';
+        if (badge) badge.style.display = 'none';
+        if (Timer.getRemaining() > 0 && !GS.answered) {
+          document.getElementById('ansInp').disabled = false;
+          document.getElementById('sendBtn').disabled = false;
+        }
+      }
+      return true;
+    } finally {
+      this.pausePending = false;
+      if (btn && String(GS.roomId || '') === String(roomId)) btn.disabled = false;
+      Poller.refresh();
     }
   },
-
-  donePostChat() {
-    document.getElementById('postChatWrap').classList.remove('show');
-    this.moveQ(1);
+  async closeReveal() {
+    if (this.postChatPending) return false;
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    const expectedQ = GS.currentQ;
+    if (!roomId || !roomToken) return false;
+    this.postChatPending = true;
+    Poller.invalidateState();
+    try {
+      const opened = await DB.cas(roomId, { current_q: expectedQ, status: 'playing' },
+        { post_chat_open: 1 }, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!opened || !opened[0]) {
+        if (sameSession) await Poller.refresh();
+        return false;
+      }
+      if (!sameSession) return false;
+      Modal.hide('revealModal');
+      Audio.click();
+      GS.lastPostOpen = 1;
+      document.getElementById('postChatWrap').classList.add('show');
+      // Opening the channel never rewrites its log; concurrent closes cannot erase a message.
+      return true;
+    } finally {
+      this.postChatPending = false;
+      Poller.refresh();
+    }
+  },
+  async donePostChat() {
+    return this.moveQ(1);
   },
 
   pickPun(type) {
@@ -1582,53 +1697,153 @@ const Game = {
   },
 
   async _sendPun(type, txt) {
-    Modal.hide('punSelectModal');
-    GS.punSent = true;
-    Audio.punish();
-    const emojis = { romantic:'💋', fun:'😄', hard:'😈', custom:'✏️' };
-    const labels = { romantic:'رومانسي', fun:'حركي', hard:'قاسي', custom:'مخصص' };
-    // Show punishment screen to answerer (view only, no done button)
-    UI.showPunScreen({
-      emoji: emojis[type] || '🎯',
-      text: txt,
-      type: labels[type] || '',
-      title: '✓ أرسلت العقاب!',
-      sub: 'بانتظار تنفيذ العقاب من الطرف الثاني...',
-      showDone: false
-    });
+    if (this.punishmentPending) return false;
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    const expectedQ = GS.currentQ;
+    if (!roomId || !roomToken) return false;
+    this.punishmentPending = true;
+    Poller.invalidateState();
     const punJSON = JSON.stringify({ type, text: txt });
-    GS.lastPun = punJSON;
-    GS.punChatMsgs = []; GS.lastPunChatLen = 0;
-    await DB.upd(GS.roomId, { punishment: punJSON, pun_chat_log: '[]' });
+    try {
+      Chat.clearChannel('pun');
+      const saved = await DB.cas(roomId, {
+        current_q: expectedQ, status: 'playing', punishment: null
+      }, { punishment: punJSON, pun_chat_log: '[]' }, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!saved || !saved[0]) {
+        if (sameSession) await Poller.refresh();
+        return false;
+      }
+      if (!sameSession) return false;
+      Modal.hide('punSelectModal');
+      GS.punSent = true;
+      Audio.punish();
+      const emojis = { romantic:'💋', fun:'😄', hard:'😈', custom:'✏️' };
+      const labels = { romantic:'رومانسي', fun:'حركي', hard:'قاسي', custom:'مخصص' };
+      UI.showPunScreen({
+        emoji: emojis[type] || '🎯',
+        text: txt,
+        type: labels[type] || '',
+        title: '✓ أرسلت العقاب!',
+        sub: 'بانتظار تنفيذ العقاب من الطرف الثاني...',
+        showDone: false
+      });
+      GS.lastPun = punJSON;
+      GS.punChatMsgs = []; GS.lastPunChatLen = 0;
+      return true;
+    } finally {
+      this.punishmentPending = false;
+      Poller.refresh();
+    }
   },
-
   async punDone() {
-    document.getElementById('punScreen').classList.remove('show');
-    await DB.upd(GS.roomId, { punishment: 'done', pun_chat_log: '[]' });
-    GS.lastPun = 'done';
-    setTimeout(() => this.moveQ(1), 400);
+    if (this.punishmentPending) return false;
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    const expectedQ = GS.currentQ;
+    const expectedPunishment = GS.lastPun;
+    if (!roomId || !roomToken || !expectedPunishment || expectedPunishment === 'done') return false;
+    this.punishmentPending = true;
+    Poller.invalidateState();
+    try {
+      const saved = await DB.cas(roomId, {
+        current_q: expectedQ, status: 'playing', punishment: expectedPunishment
+      }, { punishment: 'done', pun_chat_log: '[]' }, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!saved || !saved[0]) {
+        if (sameSession) await Poller.refresh();
+        return false;
+      }
+      if (!sameSession) return false;
+      Chat.clearChannel('pun');
+      document.getElementById('punScreen').classList.remove('show');
+      GS.lastPun = 'done';
+      setTimeout(() => this.moveQ(1), 400);
+      return true;
+    } finally {
+      this.punishmentPending = false;
+      Poller.refresh();
+    }
   },
-
-  requestEnd() {
-    Audio.click();
-    Toast.show('بانتظار موافقة الطرف الثاني...', 'warning');
-    DB.upd(GS.roomId, { end_request: GS.myName });
+  async requestEnd() {
+    if (this.endActionPending) return false;
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    if (!roomId || !roomToken) return false;
+    this.endActionPending = true;
+    Poller.invalidateState();
+    try {
+      const saved = await DB.cas(roomId, { status: 'playing', end_request: null },
+        { end_request: this.endRequestMarker() }, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!saved || !saved[0]) {
+        if (sameSession) await Poller.refresh();
+        return false;
+      }
+      if (!sameSession) return false;
+      Audio.click();
+      Toast.show('بانتظار موافقة الطرف الثاني...', 'warning');
+      return true;
+    } finally {
+      this.endActionPending = false;
+      Poller.refresh();
+    }
   },
-
   async acceptEnd() {
-    Modal.hide('endReqModal');
-    await DB.upd(GS.roomId, { end_request: 'accepted' });
-    await this.showResults();
+    if (this.endActionPending) return false;
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    if (!roomId || !roomToken) return false;
+    this.endActionPending = true;
+    Poller.invalidateState();
+    try {
+      const requestMarker = GS.lastEndReq || (GS.isHost ? 'role:guest' : 'role:host');
+      const saved = await DB.cas(roomId, { status: 'playing', end_request: requestMarker },
+        { end_request: 'accepted' }, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!saved || !saved[0]) {
+        if (sameSession) await Poller.refresh();
+        return false;
+      }
+      if (!sameSession) return false;
+      Modal.hide('endReqModal');
+      await this.showResults();
+      return true;
+    } finally {
+      this.endActionPending = false;
+      Poller.refresh();
+    }
   },
-
-  rejectEnd() {
-    Modal.hide('endReqModal');
-    DB.upd(GS.roomId, { end_request: null });
-    GS.lastEndReq = '';
-    Toast.show('تم الرفض — تكمل اللعبة ✦', 'success');
+  async rejectEnd() {
+    if (this.endActionPending) return false;
+    const roomId = GS.roomId;
+    const roomToken = GS.roomToken;
+    if (!roomId || !roomToken) return false;
+    this.endActionPending = true;
+    Poller.invalidateState();
+    try {
+      const requestMarker = GS.lastEndReq || (GS.isHost ? 'role:guest' : 'role:host');
+      const saved = await DB.cas(roomId, { status: 'playing', end_request: requestMarker },
+        { end_request: null }, { silent: true, roomToken });
+      const sameSession = String(GS.roomId || '') === String(roomId) && GS.roomToken === roomToken;
+      if (!saved || !saved[0]) {
+        if (sameSession) await Poller.refresh();
+        return false;
+      }
+      if (!sameSession) return false;
+      Modal.hide('endReqModal');
+      GS.lastEndReq = '';
+      Toast.show('تم الرفض — تكمل اللعبة ✦', 'success');
+      return true;
+    } finally {
+      this.endActionPending = false;
+      Poller.refresh();
+    }
   },
-
   async showResults() {
+    if (this.resultsShowing) return;
+    this.resultsShowing = true;
     History.save({
       myName: GS.myName,
       partnerName: GS.partnerName,
@@ -1666,8 +1881,9 @@ const Game = {
 ═══════════════════════════════════════ */
 const Poller = (() => {
   let iv = null, autoSkipTm = null;
-  let generation = 0, pollBusyGeneration = null;
+  let generation = 0, stateGeneration = 0, pollBusyGeneration = null;
   let pollErrorNotified = false, emptyReads = 0, joinTransition = false;
+  let refreshRequested = false;
 
   function setConnection(online) {
     const dot = document.getElementById('connDot');
@@ -1715,6 +1931,12 @@ const Poller = (() => {
     if (Number(room.current_q) !== GS.currentQ) {
       const index = Number(room.current_q);
       GS.currentQ = Number.isInteger(index) && Qs[index] ? index : 0;
+      Chat.clearChannel('post');
+      Chat.clearChannel('pun');
+      GS.postChats = []; GS.lastPostLen = 0;
+      GS.punChatMsgs = []; GS.lastPunChatLen = 0;
+      document.getElementById('postChatMsgs').innerHTML = '';
+      document.getElementById('punChatMsgs').innerHTML = '';
       if (Qs[GS.currentQ].c === 'b') GS.boldQsThisRound++;
       if (!GS.usedQs.includes(GS.currentQ)) GS.usedQs.push(GS.currentQ);
       Session.save(Session.load()?.code || '');
@@ -1771,6 +1993,18 @@ const Poller = (() => {
     // ── Answers ──
     const partnerAns = GS.isHost ? room.guest_answer : room.host_answer;
     const myAns      = GS.isHost ? room.host_answer  : room.guest_answer;
+
+    if (myAns) {
+      if (!GS.answered) {
+        GS.answered = true;
+        GS.myAnsweredCount++;
+      }
+      const myAnswerDisplay = document.getElementById('myAnsDsp');
+      if (myAnswerDisplay) myAnswerDisplay.textContent = myAns;
+      document.getElementById('myAnsBox').classList.add('answered');
+      document.getElementById('ansInp').disabled = true;
+      document.getElementById('sendBtn').disabled = true;
+    }
 
     if (partnerAns) {
       if (!GS.partnerAnsweredThisQ) {
@@ -1913,9 +2147,9 @@ const Poller = (() => {
     }
 
     // ── End request ──
-    if (room.end_request && room.end_request !== GS.myName && room.end_request !== 'accepted' && room.end_request !== GS.lastEndReq) {
+    if (Game.isPartnerEndRequest(room.end_request) && room.end_request !== GS.lastEndReq) {
       GS.lastEndReq = room.end_request;
-      document.getElementById('endReqSub').textContent = room.end_request + ' يطلب إنهاء اللعبة — هل توافق؟';
+      document.getElementById('endReqSub').textContent = GS.partnerName + ' يطلب إنهاء اللعبة — هل توافق؟';
       Modal.show('endReqModal');
     }
     if (room.end_request === 'accepted') Game.showResults();
@@ -1934,18 +2168,34 @@ const Poller = (() => {
     }
   }
 
+  function invalidateState() {
+    stateGeneration += 1;
+  }
+
+  function refresh() {
+    if (!GS.roomId) return Promise.resolve(false);
+    if (Game.isStateMutationPending() || pollBusyGeneration === generation) {
+      refreshRequested = true;
+      return Promise.resolve(false);
+    }
+    refreshRequested = false;
+    return poll();
+  }
+
   async function poll() {
-    if (!GS.roomId) return;
+    if (!GS.roomId || Game.isStateMutationPending()) return;
     const runGeneration = generation;
+    const runStateGeneration = stateGeneration;
     const roomId = GS.roomId;
     const roomToken = GS.roomToken;
     const isCurrentSession = () => generation === runGeneration &&
       String(GS.roomId || '') === String(roomId || '') && GS.roomToken === roomToken;
+    const isCurrentState = () => stateGeneration === runStateGeneration && !Game.isStateMutationPending();
     if (pollBusyGeneration === runGeneration) return;
     pollBusyGeneration = runGeneration;
     try {
       const result = await DB.getStatus('id', roomId, roomToken);
-      if (!isCurrentSession()) return;
+      if (!isCurrentSession() || !isCurrentState()) return;
       if (!result.ok) {
         if (!pollErrorNotified) {
           pollErrorNotified = true;
@@ -1975,13 +2225,17 @@ const Poller = (() => {
       }
       applyRoom(room);
     } catch (error) {
-      if (isCurrentSession() && !pollErrorNotified) {
+      if (isCurrentSession() && isCurrentState() && !pollErrorNotified) {
         pollErrorNotified = true;
         setConnection(false);
         Toast.show('تعذر تحديث الغرفة؛ سنحاول مجددًا تلقائيًا.', 'warning', 5000);
       }
     } finally {
       if (pollBusyGeneration === runGeneration) pollBusyGeneration = null;
+      if (refreshRequested && GS.roomId && !Game.isStateMutationPending()) {
+        refreshRequested = false;
+        setTimeout(() => refresh(), 0);
+      }
     }
   }
 
@@ -2017,24 +2271,25 @@ const Poller = (() => {
     startJoin() {
       generation += 1;
       if (iv) clearInterval(iv);
-      pollErrorNotified = false; emptyReads = 0; joinTransition = false;
+      pollErrorNotified = false; emptyReads = 0; joinTransition = false; refreshRequested = false;
       poll();
       iv = setInterval(poll, 2500);
     },
     startGame() {
       generation += 1;
       if (iv) clearInterval(iv);
-      pollErrorNotified = false; emptyReads = 0;
+      pollErrorNotified = false; emptyReads = 0; refreshRequested = false;
       poll();
       iv = setInterval(poll, 2500);
       setAutoSkip();
     },
-    refresh() { return poll(); },
+    invalidateState,
+    refresh,
     stop() {
       generation += 1;
       if (iv) { clearInterval(iv); iv = null; }
       if (autoSkipTm) { clearTimeout(autoSkipTm); autoSkipTm = null; }
-      pollErrorNotified = false; emptyReads = 0; joinTransition = false;
+      pollErrorNotified = false; emptyReads = 0; joinTransition = false; refreshRequested = false;
     }
   };
 })();

@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE = 'ana-w-anta-v7';
+const CACHE = 'ana-w-anta-v11';
 const PRECACHE = [
   './',
   './index.html',
